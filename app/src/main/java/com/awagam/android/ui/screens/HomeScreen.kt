@@ -332,7 +332,7 @@ fun HomeScreen(
                                 append("Add blocklists containing TLDs or domains to start filtering. Use your own and ")
                             }
                             withLink(LinkAnnotation.Url(
-                                url = "https://codeberg.org/j9t/awagam#blocklists"
+                                url = "https://github.com/ia-defensa/awagam-chromium#blocklists"
                             )) {
                                 withStyle(SpanStyle(
                                     color = MaterialTheme.colorScheme.primary,
