@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AWAGAM</string>
+    <string name="vpn_notification_channel">VPN Status</string>
+    <string name="vpn_notification_title">AWAGAM Active</string>
+    <string name="vpn_notification_text">Blocking %1$d domains</string>
+    <string name="vpn_notification_disabled">Protection disabled</string>
+    <string name="battery_optimization_title">Improve Reliability</string>
+    <string name="battery_optimization_message">Android may stop DNS filtering in the background to save battery. Exempting AWAGAM ensures uninterrupted protection.</string>
+    <string name="battery_optimization_action">Exempt</string>
+</resources>

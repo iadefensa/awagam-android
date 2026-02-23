@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic colors -->
+    <color name="awagam_red">#DC2626</color>
+    <color name="awagam_green">#16A34A</color>
+    <!-- Neutral palette (shadcn-style) -->
+    <color name="awagam_dark">#252525</color>
+    <color name="awagam_charcoal">#343434</color>
+    <color name="awagam_gray">#8E8E8E</color>
+    <color name="awagam_light">#F7F7F7</color>
+</resources>
