@@ -136,7 +136,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
     // Room database
     implementation("androidx.room:room-runtime:2.6.1")
