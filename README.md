@@ -1,7 +1,5 @@
 # AWAGAM Android TLD and Domain Blocker
 
-[![Steady](https://badgen.net/static/support/this%20project/black)](https://steady.page/en/meiert) [![Buy Me a Coffee](https://badgen.net/static/support/this%20project/pink?icon=buymeacoffee)](https://buymeacoffee.com/meiert)
-
 A DNS-based TLD and domain blocker for Android, and companion app to the [AWAGAM browser extension](https://codeberg.org/user/awagam).
 
 ## Features
