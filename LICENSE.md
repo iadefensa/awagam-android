@@ -1,4 +1,4 @@
-Required Notice: Copyright IA Defensa (https://iadefensa.com/)
+Required Notice: Copyright [Jens Oliver Meiert](https://meiert.com/) ([IA Defensa](https://iadefensa.com/))
 
 # PolyForm Noncommercial License 1.0.0
 

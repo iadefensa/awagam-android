@@ -180,3 +180,7 @@ com.awagam.android/
 ```
 
 Tests: `BlocklistParserTest`, `BlocklistValidatorTest`, `DnsPacketTest`, `DomainMatcherTest`, `HomeViewModelTest`
+
+## Contributing
+
+[Contributions are welcome.](CONTRIBUTING.md) They are subject to the [Contributor License Agreement](CLA.md).
