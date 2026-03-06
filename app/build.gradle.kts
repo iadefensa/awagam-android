@@ -149,7 +149,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // WorkManager for background updates
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.work:work-runtime-ktx:2.11.1")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
