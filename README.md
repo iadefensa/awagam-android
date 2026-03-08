@@ -1,6 +1,8 @@
-# AWAGAM Android TLD and Domain Blocker
+# IA Defensa AWAGAM Android TLD and Domain Blocker
 
-A DNS-based TLD and domain blocker for Android, and companion app to the [AWAGAM browser extension](https://codeberg.org/user/awagam).
+A DNS-based TLD and domain blocker for Android, and companion app to the [IA Defensa AWAGAM browser extension](https://codeberg.org/user/awagam).
+
+🔒 This app saves no data. Source code access is available. For business and government use, [purchase a license](https://iadefensa.gumroad.com/). Priority support and custom options available.
 
 ## Features
 
