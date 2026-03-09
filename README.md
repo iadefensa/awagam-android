@@ -2,7 +2,7 @@
 
 A DNS-based TLD and domain blocker for Android, and companion app to the [IA Defensa AWAGAM browser extension](https://codeberg.org/user/awagam).
 
-🔒 This app saves no data. Source code access is available. For business and government use, [purchase a license](https://iadefensa.gumroad.com/). Priority support and custom options available.
+🔒 This app saves no data. Source code access is available. For business and government use, [purchase a license](https://payhip.com/iadefensa). Priority support and custom options available.
 
 ## Features
 
