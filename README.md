@@ -9,7 +9,7 @@ A DNS-based TLD and domain blocker for Android, and companion app to the [IA Def
 * Block TLDs and domains at the DNS level
   - Local VPN for DNS filtering (no external routing)
   - DoH (DNS-over-HTTPS) upstream (DNS4EU, Cloudflare, Google, Quad9, and others)
-  - Compatible with AWAGAM browser extension blocklist format ([spec](https://github.com/iadefensa/awagam-chromium#blocklist-format), [converter](https://hell.meiert.org/awagam/))
+  - Compatible with AWAGAM browser extension blocklist format ([spec](https://github.com/iadefensa/awagam-chromium#blocklist-format), [converter](https://iadefensa.com/awagam/))
 * Add, edit, and manage blocklist URLs
 * Temporarily disable protection (5 mins, 15 mins, 1 hour) with auto-restart
 * DNS query statistics (queries, blocked requests, cache performance)
