@@ -95,9 +95,9 @@ class BlocklistRepository(private val context: Context) {
                     blockedTlds.add(normalized.lowercase())
                 }
 
-                // Normalize domains (convert IDN to punycode)
+                // Normalize domains (convert IDN to punycode, strip www prefix)
                 group.domains.forEach { domain ->
-                    val normalized = normalizeDomain(domain)
+                    val normalized = normalizeDomain(domain).removePrefix("www.")
                     blockedDomains.add(normalized)
                 }
 
