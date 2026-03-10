@@ -76,6 +76,14 @@ class DomainMatcherTest {
     }
 
     @Test
+    fun `www domain entry blocks apex and www`() {
+        matcher.addDomain("www.blocked.com")
+        assertTrue(matcher.isBlocked("blocked.com"))
+        assertTrue(matcher.isBlocked("www.blocked.com"))
+        assertTrue(matcher.isBlocked("sub.blocked.com"))
+    }
+
+    @Test
     fun `domain matching is case insensitive`() {
         matcher.addDomain("Blocked.COM")
         assertTrue(matcher.isBlocked("blocked.com"))
@@ -159,7 +167,7 @@ class DomainMatcherTest {
         }
 
         fun addDomain(domain: String) {
-            val normalized = normalizeDomain(domain)
+            val normalized = normalizeDomain(domain).removePrefix("www.")
             blockedDomains.add(normalized)
         }
 
