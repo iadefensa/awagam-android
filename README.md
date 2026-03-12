@@ -1,27 +1,23 @@
-# IA Defensa AWAGAM Android TLD and Domain Blocker
+# IA Defensa AWAGAM TLD and Domain Blocker
 
 A DNS-based TLD and domain blocker for Android, and companion app to the [IA Defensa AWAGAM browser extension](https://codeberg.org/user/awagam).
 
-🔒 This app saves no data. Source code access is available. For business and government use, [purchase a license](https://payhip.com/iadefensa). Priority support and custom options available.
+🔒 This app saves no data. The source code is available for auditing. The app is free for personal use—for commercial use, [purchase a license](https://payhip.com/iadefensa). Priority support and custom options available.
 
 ## Features
 
-* Block TLDs and domains at the DNS level
+* **Block TLDs and domains at the DNS level**
   - Local VPN for DNS filtering (no external routing)
   - DoH (DNS-over-HTTPS) upstream (DNS4EU, Cloudflare, Google, Quad9, and others)
   - Compatible with AWAGAM browser extension blocklist format ([spec](https://github.com/iadefensa/awagam-chromium#blocklist-format), [converter](https://iadefensa.com/awagam/))
-* Add, edit, and manage blocklist URLs
-* Temporarily disable protection (5 mins, 15 mins, 1 hour) with auto-restart
-* DNS query statistics (queries, blocked requests, cache performance)
-* Import/export configuration (AWAGAM format, Pi-hole, AdGuard Home, hosts file)
-* Background blocklist updates (every 6 hours)
-* VPN watchdog for automatic service recovery
-* Battery optimization guidance for reliable background operation
-* Auto-start on boot
-
-## Requirements
-
-* Android 9 (API 28) or higher
+* **Add, edit, and manage blocklist URLs**
+* **Temporarily disable protection** (5 mins, 15 mins, 1 hour) with auto-restart
+* **DNS query statistics** (queries, blocked requests, cache performance)
+* **Import/export configuration** (AWAGAM format, Pi-hole, AdGuard Home, hosts file)
+* **Background blocklist updates** (every 6 hours)
+* **VPN watchdog for automatic service recovery**
+* **Battery optimization guidance** for reliable background operation
+* **Auto-start on boot**
 
 ## How It Works
 
@@ -40,9 +36,9 @@ AWAGAM creates a local VPN that intercepts DNS queries only. Blocked domains res
                         └───────────┘
 ```
 
-Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered.
+Your actual Internet traffic is not routed through this VPN—only DNS lookups are filtered.
 
-## Limitations
+### Limitations
 
 | Limitation | Explanation |
 | --- | --- |
@@ -50,12 +46,24 @@ Your actual Internet traffic is not routed through the VPN—only DNS lookups ar
 | **VPN slot conflict** | Android allows only one VPN at a time. Cannot run alongside other VPN apps. |
 | **DoH bypass** | Apps using their own DNS-over-HTTPS bypass system DNS filtering. |
 
-### For VPN Users
+#### For VPN Users
 
 If you use a VPN for privacy or work, AWAGAM cannot run simultaneously. Alternatives:
 
 * Export blocklists and import them into Pi-hole, AdGuard Home, or your router
 * Use your VPN provider’s DNS filtering if available
+
+### Privacy
+
+* All filtering happens locally on device
+* No analytics or tracking
+* No data collection
+* Open source for full transparency
+
+External connections:
+
+* DNS queries to user-selected upstream (DNS4EU Protective default)
+* HTTPS fetches to user-configured blocklist URLs
 
 ## Blocklist Format
 
@@ -80,18 +88,6 @@ Uses [the same JSON format as the browser extension](https://github.com/iadefens
 
 Note: URL patterns are parsed but ignored at DNS level.
 
-## Privacy
-
-* All filtering happens locally on device
-* No analytics or tracking
-* No data collection
-* Open source for full transparency
-
-External connections:
-
-* DNS queries to user-selected upstream (DNS4EU Protective default)
-* HTTPS fetches to user-configured blocklist URLs
-
 ## DNS Providers
 
 The default upstream is [DNS4EU](https://www.joindns4.eu/), an EU-based, GDPR-compliant resolver that blocks malware and phishing. Supported providers:
@@ -107,7 +103,7 @@ The default upstream is [DNS4EU](https://www.joindns4.eu/), an EU-based, GDPR-co
 
 Provider IPs are hardcoded to avoid DNS lookup loops when the VPN is active.
 
-## Building
+## Development
 
 ### Requirements
 
@@ -162,7 +158,7 @@ Output:
 | **F-Droid** | Source | Submit repository; F-Droid builds from source |
 | **Direct** | APK | Distribute the signed `.apk` file |
 
-## Project Structure
+### Project Structure
 
 ```
 com.awagam.android/
