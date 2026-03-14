@@ -8,4 +8,4 @@ By submitting a pull request or otherwise contributing to this repository, you (
 
 3. No obligation. You understand that Jens Oliver Meiert (IA Defensa) is under no obligation to use or include your contributions.
 
-4. Awareness of license. You understand that this software is licensed under PolyForm Noncommercial and that Jens Oliver Meiert (IA Defensa) may offer commercial licenses for the software, including contributions you make.
+4. Awareness of license. You understand that this software is licensed under the current IA Defensa Personal Use License and that Jens Oliver Meiert (IA Defensa) may offer commercial licenses for the software, including contributions you make.
