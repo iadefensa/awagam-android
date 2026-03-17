@@ -419,7 +419,7 @@ fun HomeScreen(
                             append("For URL-level blocking, use ")
                         }
                         withLink(LinkAnnotation.Url(
-                            url = "https://chromewebstore.google.com/detail/awagam-tld-domain-and-url/efnpgpiffjglnijemnmdkemiliiialbm"
+                            url = "https://chromewebstore.google.com/detail/ia-defensa-awagam-tld-dom/efnpgpiffjglnijemnmdkemiliiialbm"
                         )) {
                             withStyle(SpanStyle(
                                 color = MaterialTheme.colorScheme.primary,

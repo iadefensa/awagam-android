@@ -203,7 +203,7 @@ fun SettingsScreen(
                                 append("Note: URL patterns (like “example.com/path/*”) are only supported in ")
                             }
                             withLink(LinkAnnotation.Url(
-                                url = "https://chromewebstore.google.com/detail/awagam-tld-domain-and-url/efnpgpiffjglnijemnmdkemiliiialbm"
+                                url = "https://chromewebstore.google.com/detail/ia-defensa-awagam-tld-dom/efnpgpiffjglnijemnmdkemiliiialbm"
                             )) {
                                 withStyle(SpanStyle(
                                     color = MaterialTheme.colorScheme.primary,
