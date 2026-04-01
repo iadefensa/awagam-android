@@ -19,10 +19,18 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
-// Run unit tests before assembling APK to catch regressions early
+// Run unit tests before assembling APK to catch regressions early, and rename output to include version
 tasks.whenTaskAdded {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
+        doLast {
+            val variant = name.removePrefix("assemble").lowercase()
+            val targetDir = layout.buildDirectory.dir("outputs/apk").get().asFile
+            layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
+                .listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
+                    file.renameTo(File(targetDir, "awagam-$appVersionName-$variant.apk"))
+                }
+        }
     }
 }
 
@@ -94,15 +102,6 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
-    }
-}
-
-// Rename APK output files to awagam-{version}-{variant}.apk
-androidComponents {
-    onVariants { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("awagam-$appVersionName-${variant.name}.apk")
-        }
     }
 }
 
