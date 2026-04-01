@@ -25,11 +25,10 @@ tasks.whenTaskAdded {
         dependsOn("testDebugUnitTest")
         doLast {
             val variant = name.removePrefix("assemble").lowercase()
-            val targetDir = layout.buildDirectory.dir("outputs/apk").get().asFile
-            layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
-                .listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
-                    file.renameTo(File(targetDir, "awagam-$appVersionName-$variant.apk"))
-                }
+            val outDir = layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
+            outDir.listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
+                file.renameTo(File(outDir, "awagam-$appVersionName.apk"))
+            }
         }
     }
 }
