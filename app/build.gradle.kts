@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
@@ -11,6 +10,8 @@ plugins {
 // Set base archive name for AAB bundles
 base.archivesName.set("awagam")
 
+val appVersionName = "1.0.0-beta"
+
 // Load keystore properties if available
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
@@ -18,10 +19,17 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
-// Run unit tests before assembling APK to catch regressions early
+// Run unit tests before assembling APK to catch regressions early, and rename output to include version
 tasks.whenTaskAdded {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
+        doLast {
+            val variant = name.removePrefix("assemble").lowercase()
+            val outDir = layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
+            outDir.listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
+                file.renameTo(File(outDir, "awagam-$appVersionName.apk"))
+            }
+        }
     }
 }
 
@@ -34,20 +42,11 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0-beta"
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
-        }
-    }
-
-    // Rename APK/AAB output files to awagam-{version}-{variant}.apk
-    applicationVariants.all {
-        outputs.all {
-            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            val versionName = defaultConfig.versionName
-            outputImpl.outputFileName = "awagam-$versionName-${name}.apk"
         }
     }
 
