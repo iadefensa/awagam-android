@@ -10,6 +10,8 @@ plugins {
 // Set base archive name for AAB bundles
 base.archivesName.set("awagam")
 
+val appVersionName = "1.0.0-beta"
+
 // Load keystore properties if available
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
@@ -33,20 +35,11 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0-beta"
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
-        }
-    }
-
-    // Rename APK/AAB output files to awagam-{version}-{variant}.apk
-    applicationVariants.all {
-        outputs.all {
-            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            val versionName = defaultConfig.versionName
-            outputImpl.outputFileName = "awagam-$versionName-${name}.apk"
         }
     }
 
@@ -101,6 +94,15 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Rename APK output files to awagam-{version}-{variant}.apk
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("awagam-$appVersionName-${variant.name}.apk")
+        }
     }
 }
 
