@@ -180,7 +180,7 @@ fun SettingsScreen(
                                 append("AWAGAM uses JSON-based blocklists to block entire domains and TLDs via DNS filtering. Find starter blocklists at ")
                             }
                             withLink(LinkAnnotation.Url(
-                                url = "https://github.com/iadefensa/awagam-chromium#blocklists"
+                                url = "https://iadefensa.com/solutions/awagam-chromium/#blocklists"
                             )) {
                                 withStyle(SpanStyle(
                                     color = MaterialTheme.colorScheme.primary,
