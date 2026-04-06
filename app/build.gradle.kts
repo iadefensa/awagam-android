@@ -131,10 +131,10 @@ dependencies {
 
     // Networking
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
-    implementation("io.ktor:ktor-client-core:3.4.1")
-    implementation("io.ktor:ktor-client-okhttp:3.4.1")
-    implementation("io.ktor:ktor-client-content-negotiation:3.4.1")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.1")
+    implementation("io.ktor:ktor-client-core:3.4.2")
+    implementation("io.ktor:ktor-client-okhttp:3.4.2")
+    implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
