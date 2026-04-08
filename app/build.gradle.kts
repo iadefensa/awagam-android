@@ -127,7 +127,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.7")
 
     // DNS parsing
-    implementation("dnsjava:dnsjava:3.6.2")
+    implementation("dnsjava:dnsjava:3.6.4")
 
     // Networking
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
