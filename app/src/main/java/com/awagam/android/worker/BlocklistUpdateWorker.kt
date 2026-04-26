@@ -99,7 +99,7 @@ class BlocklistUpdateWorker(
         } else {
             "$failedCount blocklists could not be refreshed. Tap to review."
         }
-        val notification = NotificationCompat.Builder(applicationContext, AWAGAMApplication.NOTIFICATION_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(applicationContext, AWAGAMApplication.BLOCKLIST_ERROR_CHANNEL_ID)
             .setContentTitle("Blocklist update failed")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_stat_vpn)
