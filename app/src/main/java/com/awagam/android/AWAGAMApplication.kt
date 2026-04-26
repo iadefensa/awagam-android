@@ -49,5 +49,6 @@ class AWAGAMApplication : Application() {
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "awagam_vpn_status"
         const val NOTIFICATION_ID = 1
+        const val BLOCKLIST_ERROR_NOTIFICATION_ID = 2
     }
 }

@@ -33,6 +33,7 @@ class BlocklistRepository(private val context: Context) {
     private val blockedTlds = mutableSetOf<String>()
     private val blockedDomains = mutableSetOf<String>()
     private val blockedUrls = mutableSetOf<String>() // For export to Pi-hole/AdGuard
+    private var externalSourceCount = 0
 
     private val _blocklistStats = MutableStateFlow(BlocklistStats())
     val blocklistStats: StateFlow<BlocklistStats> = _blocklistStats.asStateFlow()
@@ -59,12 +60,14 @@ class BlocklistRepository(private val context: Context) {
     }
 
     private suspend fun loadExternalBlocklists() {
+        externalSourceCount = 0
         try {
             val configs = externalBlocklistManager.blocklistsFlow.first()
             configs.filter { it.enabled }.forEach { config ->
                 val cached = externalBlocklistManager.getCachedBlocklist(config.id)
                 if (cached != null) {
                     parseBlocklist(cached)
+                    externalSourceCount++
                     Log.d(TAG, "Loaded blocklist: ${config.name}")
                 }
             }
@@ -125,7 +128,7 @@ class BlocklistRepository(private val context: Context) {
             tldCount = blockedTlds.size,
             domainCount = blockedDomains.size,
             urlCount = blockedUrls.size,
-            sourceCount = 1 // TODO: count external sources
+            sourceCount = 1 + externalSourceCount
         )
     }
 
