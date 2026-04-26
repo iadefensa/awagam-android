@@ -24,7 +24,9 @@ class AWAGAMApplication : Application() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val vpnChannel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             getString(R.string.vpn_notification_channel),
             NotificationManager.IMPORTANCE_LOW
@@ -33,8 +35,16 @@ class AWAGAMApplication : Application() {
             setShowBadge(false)
         }
 
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(channel)
+        val errorChannel = NotificationChannel(
+            BLOCKLIST_ERROR_CHANNEL_ID,
+            "Blocklist Errors",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Alerts when a background blocklist update fails"
+            setShowBadge(true)
+        }
+
+        notificationManager.createNotificationChannels(listOf(vpnChannel, errorChannel))
     }
 
     private fun scheduleBlocklistUpdates() {
@@ -48,6 +58,7 @@ class AWAGAMApplication : Application() {
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "awagam_vpn_status"
+        const val BLOCKLIST_ERROR_CHANNEL_ID = "awagam_blocklist_errors"
         const val NOTIFICATION_ID = 1
         const val BLOCKLIST_ERROR_NOTIFICATION_ID = 2
     }
