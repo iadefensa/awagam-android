@@ -104,4 +104,18 @@ class ExternalBlocklistManagerTest {
         val url = "https://cdn.example.org/lists/domains.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
+
+    // Host-Exact Matching (Not Substring)
+
+    @Test
+    fun `URL whose path contains github-com substring is unchanged`() {
+        val url = "https://example.com/mirror/github.com/blob/main/file.json"
+        assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
+    }
+
+    @Test
+    fun `URL whose path contains gitlab-com substring is unchanged`() {
+        val url = "https://example.com/mirror/gitlab.com/-/blob/main/file.json"
+        assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
+    }
 }
