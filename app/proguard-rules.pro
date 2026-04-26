@@ -1,5 +1,11 @@
 # AWAGAM Android ProGuard Rules
 
+# Keep OkHttp3 classes (used for blocklist fetching)
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
 # Keep dnsjava classes (reflection-heavy)
 -keep class org.xbill.DNS.** { *; }
 

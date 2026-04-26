@@ -16,7 +16,7 @@ import org.junit.Test
  */
 class BlocklistValidatorTest {
 
-    // --- URL Validation Tests ---
+    // URL Validation Tests
 
     @Test
     fun `valid HTTPS URLs are accepted`() {
@@ -66,7 +66,7 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.isValidBlocklistUrl(""))
     }
 
-    // --- TLD Validation Tests ---
+    // TLD Validation Tests
 
     @Test
     fun `valid TLDs are accepted`() {
@@ -92,7 +92,7 @@ class BlocklistValidatorTest {
         // Only leading/trailing hyphens are invalid per RFC 1035
     }
 
-    // --- Domain Validation Tests ---
+    // Domain Validation Tests
 
     @Test
     fun `valid domains are accepted`() {
@@ -125,7 +125,7 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.isValidDomain("invalid..com"))
     }
 
-    // --- DNS Label Validation Tests ---
+    // DNS Label Validation Tests
 
     @Test
     fun `valid DNS labels are accepted`() {
@@ -157,7 +157,7 @@ class BlocklistValidatorTest {
         assertTrue(BlocklistValidator.isValidDnsLabel(validLabel))
     }
 
-    // --- Blocklist Entry (URL) Validation Tests ---
+    // Blocklist Entry (URL) Validation Tests
 
     @Test
     fun `valid blocklist URL entries are accepted`() {
@@ -173,7 +173,7 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.isValidBlocklistEntry(" example.com/path"))
     }
 
-    // --- JSON Depth Validation Tests ---
+    // JSON Depth Validation Tests
 
     @Test
     fun `shallow JSON passes depth validation`() {
@@ -193,7 +193,7 @@ class BlocklistValidatorTest {
         assertTrue(BlocklistValidator.validateJsonDepth(current))
     }
 
-    // --- Size Validation Tests ---
+    // Size Validation Tests
 
     @Test
     fun `content within size limit passes`() {
@@ -207,7 +207,7 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.validateSize(largeContent))
     }
 
-    // --- Blocklist Format Validation Tests ---
+    // Blocklist Format Validation Tests
 
     @Test
     fun `valid blocklist format passes`() {
@@ -271,7 +271,7 @@ class BlocklistValidatorTest {
         assertTrue(result.error?.contains("missing required") == true)
     }
 
-    // --- Config Sanitization Tests ---
+    // Config Sanitization Tests
 
     @Test
     fun `config name is truncated and sanitized`() {

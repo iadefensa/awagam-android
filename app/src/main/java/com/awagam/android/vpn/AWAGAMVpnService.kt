@@ -25,7 +25,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -361,7 +360,7 @@ class AWAGAMVpnService : VpnService() {
         stopSelf()
     }
 
-    private fun createNotification(): android.app.Notification {
+    private suspend fun createNotification(): android.app.Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -369,7 +368,7 @@ class AWAGAMVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stats = runBlocking { blocklistRepository.blocklistStats.first() }
+        val stats = blocklistRepository.blocklistStats.first()
         val totalRules = stats.tldCount + stats.domainCount
 
         return NotificationCompat.Builder(this, AWAGAMApplication.NOTIFICATION_CHANNEL_ID)

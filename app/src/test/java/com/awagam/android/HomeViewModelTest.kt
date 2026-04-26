@@ -49,14 +49,14 @@ class HomeViewModelTest {
         DependencyContainer.clear()
     }
 
-    // --- Helper Methods ---
+    // Helper Methods
 
     /** Wait for DataStore IO operations to complete on real threads. */
     private fun waitForIo() {
         Thread.sleep(500)
     }
 
-    // --- Initial State Tests ---
+    // Initial State Tests
 
     @Test
     fun `initial UI state has correct defaults`() {
@@ -67,7 +67,7 @@ class HomeViewModelTest {
         assertNull("No VPN error by default", state.vpnError)
     }
 
-    // --- Temporary Disable Tests ---
+    // Temporary Disable Tests
 
     @Test
     fun `temporaryDisable sets correct UI state`() {
@@ -112,7 +112,7 @@ class HomeViewModelTest {
         assertEquals("Countdown should be 0", 0, state.disableCountdownSeconds)
     }
 
-    // --- Duration Tests ---
+    // Duration Tests
 
     @Test
     fun `temporaryDisable with different durations sets correct countdown`() {

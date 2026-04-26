@@ -18,7 +18,7 @@ class DomainMatcherTest {
         matcher = TestDomainMatcher()
     }
 
-    // --- TLD Matching Tests ---
+    // TLD Matching Tests
 
     @Test
     fun `exact TLD match blocks domain`() {
@@ -52,7 +52,7 @@ class DomainMatcherTest {
         assertFalse(matcher.isBlocked("example.com"))
     }
 
-    // --- Domain Matching Tests ---
+    // Domain Matching Tests
 
     @Test
     fun `exact domain match blocks`() {
@@ -91,7 +91,7 @@ class DomainMatcherTest {
         assertTrue(matcher.isBlocked("Sub.Blocked.Com"))
     }
 
-    // --- IDN/Punycode Tests ---
+    // IDN/Punycode Tests
 
     @Test
     fun `punycode domain matches`() {
@@ -107,7 +107,7 @@ class DomainMatcherTest {
         assertTrue(matcher.isBlocked("xn--mnchen-3ya.de"))
     }
 
-    // --- Edge Cases ---
+    // Edge Cases
 
     @Test
     fun `empty blocklist blocks nothing`() {
@@ -134,7 +134,7 @@ class DomainMatcherTest {
         assertTrue(matcher.isBlocked("192.168.1.1"))
     }
 
-    // --- Combined TLD and Domain ---
+    // Combined TLD and Domain
 
     @Test
     fun `domain block takes precedence over TLD allow`() {
