@@ -39,27 +39,31 @@ class ExternalBlocklistManager(private val context: Context) {
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         internal fun convertToRawUrl(url: String): String {
-            val host = try { java.net.URI(url).host } catch (e: Exception) { return url }
+            val hostLower = try { java.net.URI(url).host?.lowercase() } catch (e: Exception) { null } ?: return url
 
-            if (host == "github.com" && url.contains("/blob/")) {
+            if (hostLower == "github.com" && url.contains("/blob/")) {
                 return url
-                    .replace("github.com", "raw.githubusercontent.com")
+                    .replace("://github.com/", "://raw.githubusercontent.com/", ignoreCase = true)
                     .replace("/blob/", "/")
             }
 
-            if (host == "gitlab.com" && url.contains("/-/blob/")) {
+            if (hostLower == "gitlab.com" && url.contains("/-/blob/")) {
                 return url.replace("/-/blob/", "/-/raw/")
             }
 
-            if (host == "codeberg.org" && url.contains("/src/branch/")) {
+            if (hostLower == "codeberg.org" && url.contains("/src/branch/")) {
                 return url.replace("/src/branch/", "/raw/branch/")
             }
 
-            if (host == "pastebin.com" && !url.contains("/raw/")) {
-                val regex = Regex("pastebin\\.com/([a-zA-Z0-9]+)$")
+            if (hostLower == "pastebin.com" && !url.contains("/raw/")) {
+                val regex = Regex("pastebin\\.com/([a-zA-Z0-9]+)$", RegexOption.IGNORE_CASE)
                 val match = regex.find(url)
                 if (match != null) {
-                    return url.replace("pastebin.com/${match.groupValues[1]}", "pastebin.com/raw/${match.groupValues[1]}")
+                    return url.replace(
+                        "pastebin.com/${match.groupValues[1]}",
+                        "pastebin.com/raw/${match.groupValues[1]}",
+                        ignoreCase = true
+                    )
                 }
             }
 
