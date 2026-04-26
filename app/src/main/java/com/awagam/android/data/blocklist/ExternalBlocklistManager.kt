@@ -37,6 +37,32 @@ class ExternalBlocklistManager(private val context: Context) {
         private val BLOCKLIST_CONFIGS = stringPreferencesKey("blocklist_configs")
         private val BLOCKLIST_CACHE_PREFIX = "blocklist_cache_"
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
+
+        internal fun convertToRawUrl(url: String): String {
+            if (url.contains("github.com") && url.contains("/blob/")) {
+                return url
+                    .replace("github.com", "raw.githubusercontent.com")
+                    .replace("/blob/", "/")
+            }
+
+            if (url.contains("gitlab.com") && url.contains("/-/blob/")) {
+                return url.replace("/-/blob/", "/-/raw/")
+            }
+
+            if (url.contains("codeberg.org") && url.contains("/src/branch/")) {
+                return url.replace("/src/branch/", "/raw/branch/")
+            }
+
+            if (url.contains("pastebin.com") && !url.contains("/raw/")) {
+                val regex = Regex("pastebin\\.com/([a-zA-Z0-9]+)$")
+                val match = regex.find(url)
+                if (match != null) {
+                    return url.replace("pastebin.com/${match.groupValues[1]}", "pastebin.com/raw/${match.groupValues[1]}")
+                }
+            }
+
+            return url
+        }
     }
 
     private val json = Json {
@@ -217,40 +243,6 @@ class ExternalBlocklistManager(private val context: Context) {
                 ).errorMessage
             ))
         }
-    }
-
-    /**
-     * Convert various hosting URLs to their raw content URLs.
-     */
-    private fun convertToRawUrl(url: String): String {
-        // GitHub blob URLs → raw.githubusercontent.com
-        if (url.contains("github.com") && url.contains("/blob/")) {
-            return url
-                .replace("github.com", "raw.githubusercontent.com")
-                .replace("/blob/", "/")
-        }
-
-        // GitLab blob URLs → raw URLs
-        if (url.contains("gitlab.com") && url.contains("/-/blob/")) {
-            return url.replace("/-/blob/", "/-/raw/")
-        }
-
-        // Codeberg blob URLs → raw URLs
-        if (url.contains("codeberg.org") && url.contains("/src/branch/")) {
-            return url.replace("/src/branch/", "/raw/branch/")
-        }
-
-        // Pastebin → raw
-        if (url.contains("pastebin.com") && !url.contains("/raw/")) {
-            // Convert pastebin.com/XXXX to pastebin.com/raw/XXXX
-            val regex = Regex("pastebin\\.com/([a-zA-Z0-9]+)$")
-            val match = regex.find(url)
-            if (match != null) {
-                return url.replace("pastebin.com/${match.groupValues[1]}", "pastebin.com/raw/${match.groupValues[1]}")
-            }
-        }
-
-        return url
     }
 
     /**
