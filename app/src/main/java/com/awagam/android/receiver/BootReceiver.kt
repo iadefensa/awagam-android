@@ -3,6 +3,7 @@ package com.awagam.android.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.vpn.AWAGAMVpnService
 import kotlinx.coroutines.CoroutineScope
@@ -14,6 +15,10 @@ import kotlinx.coroutines.launch
  * Receiver to optionally start VPN on device boot.
  */
 class BootReceiver : BroadcastReceiver() {
+
+    companion object {
+        private const val TAG = "BootReceiver"
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
@@ -29,6 +34,8 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     )
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to read auto-start preference on boot", e)
             } finally {
                 pending.finish()
             }
