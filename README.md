@@ -6,9 +6,9 @@ Visit IA Defensa for [general information about this app](@@).
 
 ### Requirements
 
-* Android Studio Hedgehog or newer
-* JDK 17
-* Android SDK 35
+* Android Studio Otter 3 Feature Drop (2025.2.3) or newer
+* JDK 21
+* Android SDK 36
 
 ### Debug Build
 
@@ -38,7 +38,7 @@ keyPassword=your_key_password
 Build the release:
 
 ```shell
-# Signed APK (for direct distribution or F-Droid)
+# Signed APK (for direct distribution)
 ./gradlew assembleRelease
 
 # Android App Bundle (required for Play Store)
@@ -54,7 +54,6 @@ Output:
 | Platform | Format | Notes |
 | --- | --- | --- |
 | **Play Store** | AAB | Upload the `.aab` file |
-| **F-Droid** | Source | Submit repository; F-Droid builds from source |
 | **Direct** | APK | Distribute the signed `.apk` file |
 
 ### Project Structure
@@ -76,7 +75,7 @@ com.awagam.android/
 └── worker/                  # BlocklistUpdateWorker (6h), VpnWatchdogWorker (15min)
 ```
 
-Tests: `BlocklistParserTest`, `BlocklistValidatorTest`, `DnsPacketTest`, `DomainMatcherTest`, `HomeViewModelTest`
+Tests: `BlocklistParserTest`, `BlocklistValidatorTest`, `DnsPacketTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`
 
 ## Contributing
 
