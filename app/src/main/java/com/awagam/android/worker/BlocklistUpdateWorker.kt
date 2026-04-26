@@ -4,8 +4,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -88,6 +90,12 @@ class BlocklistUpdateWorker(
     }
 
     private fun notifyRefreshFailure(failedCount: Int) {
+        if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "Skipping blocklist failure notification: POST_NOTIFICATIONS not granted")
+            return
+        }
+
         val pendingIntent = PendingIntent.getActivity(
             applicationContext,
             0,
