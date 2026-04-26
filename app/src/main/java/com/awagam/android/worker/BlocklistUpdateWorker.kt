@@ -94,13 +94,11 @@ class BlocklistUpdateWorker(
             Intent(applicationContext, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val message = if (failedCount == 1) {
-            "1 blocklist could not be refreshed. Tap to review."
-        } else {
-            "$failedCount blocklists could not be refreshed. Tap to review."
-        }
+        val message = applicationContext.resources.getQuantityString(
+            R.plurals.blocklist_update_failed_text, failedCount, failedCount
+        )
         val notification = NotificationCompat.Builder(applicationContext, AWAGAMApplication.BLOCKLIST_ERROR_CHANNEL_ID)
-            .setContentTitle("Blocklist update failed")
+            .setContentTitle(applicationContext.getString(R.string.blocklist_update_failed_title))
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_stat_vpn)
             .setContentIntent(pendingIntent)

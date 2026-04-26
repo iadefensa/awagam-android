@@ -37,10 +37,10 @@ class AWAGAMApplication : Application() {
 
         val errorChannel = NotificationChannel(
             BLOCKLIST_ERROR_CHANNEL_ID,
-            "Blocklist Errors",
+            getString(R.string.blocklist_error_channel_name),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Alerts when a background blocklist update fails"
+            description = getString(R.string.blocklist_error_channel_description)
             setShowBadge(true)
         }
 
