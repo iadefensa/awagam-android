@@ -240,7 +240,7 @@ class DnsPacketTest {
         assertEquals(0, verify)
     }
 
-    // --- TCP RST (Private DNS DoT Rejection) Tests ---
+    // TCP RST (Private DNS DoT Rejection) Tests
 
     @Test
     fun `isTcpSynToPort853 detects DoT SYN`() {
