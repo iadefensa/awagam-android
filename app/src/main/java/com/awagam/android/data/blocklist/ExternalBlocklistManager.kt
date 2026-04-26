@@ -39,21 +39,23 @@ class ExternalBlocklistManager(private val context: Context) {
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         internal fun convertToRawUrl(url: String): String {
-            if (url.contains("github.com") && url.contains("/blob/")) {
+            val host = try { java.net.URI(url).host } catch (e: Exception) { return url }
+
+            if (host == "github.com" && url.contains("/blob/")) {
                 return url
                     .replace("github.com", "raw.githubusercontent.com")
                     .replace("/blob/", "/")
             }
 
-            if (url.contains("gitlab.com") && url.contains("/-/blob/")) {
+            if (host == "gitlab.com" && url.contains("/-/blob/")) {
                 return url.replace("/-/blob/", "/-/raw/")
             }
 
-            if (url.contains("codeberg.org") && url.contains("/src/branch/")) {
+            if (host == "codeberg.org" && url.contains("/src/branch/")) {
                 return url.replace("/src/branch/", "/raw/branch/")
             }
 
-            if (url.contains("pastebin.com") && !url.contains("/raw/")) {
+            if (host == "pastebin.com" && !url.contains("/raw/")) {
                 val regex = Regex("pastebin\\.com/([a-zA-Z0-9]+)$")
                 val match = regex.find(url)
                 if (match != null) {
