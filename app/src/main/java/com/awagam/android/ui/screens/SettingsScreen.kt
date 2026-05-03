@@ -177,7 +177,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         val mainText = buildAnnotatedString {
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append("AWAGAM uses JSON-based blocklists to block entire domains and TLDs via DNS filtering. Find starter blocklists at ")
+                                append("AWAGAM uses JSON-based blocklists to block entire domains and TLDs via DNS filtering. Find starter blocklists on ")
                             }
                             withLink(LinkAnnotation.Url(
                                 url = "https://iadefensa.com/solutions/awagam-chromium/#blocklists"
@@ -186,7 +186,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                     textDecoration = TextDecoration.Underline
                                 )) {
-                                    append("codeberg.org/j9t/awagam")
+                                    append("iadefensa.com")
                                 }
                             }
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
