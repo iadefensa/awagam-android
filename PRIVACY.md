@@ -69,7 +69,7 @@ The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution. Their p
 
 ## Open Source
 
-This app is open source. You can verify these claims by reviewing the code under [codeberg.org/j9t/awagam](https://github.com/iadefensa/awagam-chromium).
+This app is open source. You can verify these claims by reviewing the code [on GitHub](https://github.com/iadefensa/awagam-android).
 
 ## Contact
 

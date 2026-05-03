@@ -226,7 +226,9 @@ fun HomeScreen(
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.tertiary,
-                            checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+                            checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }
