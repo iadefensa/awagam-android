@@ -130,7 +130,7 @@ dependencies {
     implementation("dnsjava:dnsjava:3.6.5")
 
     // Networking
-    implementation("com.squareup.okhttp3:okhttp:5.3.2")
+    implementation("com.squareup.okhttp3:okhttp:5.4.0")
     implementation("io.ktor:ktor-client-core:3.5.0")
     implementation("io.ktor:ktor-client-okhttp:3.5.0")
     implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
