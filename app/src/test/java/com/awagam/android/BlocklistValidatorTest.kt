@@ -3,6 +3,7 @@ package com.awagam.android
 import com.awagam.android.data.blocklist.BlocklistGroup
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
+import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -116,6 +117,17 @@ class BlocklistValidatorTest {
             """{"imports": ["https://example.com/a.json", "https://example.com/a.json"]}"""
         )
         val result = BlocklistValidator.validateBundleFormat(bundle)
+        assertFalse(result.valid)
+    }
+
+    @Test
+    fun `bundles with duplicate imports via different URL representations are rejected`() {
+        val bundle = Json.parseToJsonElement(
+            """{"imports": ["https://github.com/user/repo/blob/main/list.json", "https://raw.githubusercontent.com/user/repo/main/list.json"]}"""
+        )
+        val result = BlocklistValidator.validateBundleFormat(bundle) {
+            ExternalBlocklistManager.convertToRawUrl(it)
+        }
         assertFalse(result.valid)
     }
 

@@ -223,6 +223,10 @@ class ExternalBlocklistManager(private val context: Context) {
                 // Bundles reference other blocklists instead of containing rules
                 val resolved = resolveBundle(jsonElement, body.length)
                 bodyToCache = json.encodeToString(resolved.groups)
+                // Guard the cache as well—group ID prefixes can grow the merged result past the fetched sizes
+                if (!BlocklistValidator.validateSize(bodyToCache)) {
+                    throw Exception("Bundle too large. The merged blocklist exceeds 10 MB.")
+                }
                 metadata = resolved.metadata
             } else {
                 // Parse into blocklist groups
@@ -277,7 +281,7 @@ class ExternalBlocklistManager(private val context: Context) {
      * Bundles may only import plain blocklists, never other bundles.
      */
     private fun resolveBundle(bundleElement: JsonElement, bundleSize: Int): ResolvedBundle {
-        val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement)
+        val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement) { convertToRawUrl(it) }
         if (!bundleValidation.valid) {
             throw Exception("Validation failed: ${bundleValidation.error}")
         }

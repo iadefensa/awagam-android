@@ -144,8 +144,13 @@ object BlocklistValidator {
     /**
      * Validate AWAGAM bundle format.
      * A bundle contains only the “imports” field with 1–100 unique HTTPS URLs.
+     * Pass a normalizer so the same blocklist can’t be imported twice via
+     * different URL representations (e.g., GitHub blob vs. raw).
      */
-    fun validateBundleFormat(element: JsonElement): BundleValidationResult {
+    fun validateBundleFormat(
+        element: JsonElement,
+        normalizeUrl: (String) -> String = { it }
+    ): BundleValidationResult {
         if (!isBundle(element)) {
             return BundleValidationResult(false, "A bundle must be an object with an \"imports\" array")
         }
@@ -165,13 +170,15 @@ object BlocklistValidator {
         }
 
         val urls = mutableListOf<String>()
+        val seenUrls = mutableSetOf<String>()
         for (item in importsArray) {
             val url = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
                 ?: return BundleValidationResult(false, "\"imports\" contains a non-string entry")
-            if (url.length > MAX_URL_LENGTH || !isValidBlocklistUrl(url)) {
+            val normalizedUrl = normalizeUrl(url)
+            if (url.length > MAX_URL_LENGTH || !isValidBlocklistUrl(normalizedUrl)) {
                 return BundleValidationResult(false, "Invalid or insecure import URL: $url")
             }
-            if (url in urls) {
+            if (!seenUrls.add(normalizedUrl)) {
                 return BundleValidationResult(false, "Duplicate import URL: $url")
             }
             urls.add(url)
