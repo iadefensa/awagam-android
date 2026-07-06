@@ -143,7 +143,7 @@ object BlocklistValidator {
 
     /**
      * Validate AWAGAM bundle format.
-     * A bundle contains only the “imports” field with 1–20 unique HTTPS URLs.
+     * A bundle contains only the “imports” field with 1–100 unique HTTPS URLs.
      */
     fun validateBundleFormat(element: JsonElement): BundleValidationResult {
         if (!isBundle(element)) {
