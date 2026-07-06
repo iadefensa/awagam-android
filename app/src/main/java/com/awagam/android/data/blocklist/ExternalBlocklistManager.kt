@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -215,18 +216,30 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("JSON structure too deeply nested. Maximum depth is 20.")
             }
 
-            // Parse into blocklist groups
-            val groups: Map<String, BlocklistGroup> = json.decodeFromString(body)
+            val bodyToCache: String
+            val metadata: BlocklistMetadata
 
-            // Validate blocklist format (TLDs, domains, URLs)
-            val validationResult = BlocklistValidator.validateBlocklistFormat(groups)
-            if (!validationResult.valid) {
-                throw Exception("Validation failed: ${validationResult.error}")
+            if (BlocklistValidator.isBundle(jsonElement)) {
+                // Bundles reference other blocklists instead of containing rules
+                val resolved = resolveBundle(jsonElement, body.length)
+                bodyToCache = json.encodeToString(resolved.groups)
+                metadata = resolved.metadata
+            } else {
+                // Parse into blocklist groups
+                val groups: Map<String, BlocklistGroup> = json.decodeFromString(body)
+
+                // Validate blocklist format (TLDs, domains, URLs)
+                val validationResult = BlocklistValidator.validateBlocklistFormat(groups)
+                if (!validationResult.valid) {
+                    throw Exception("Validation failed: ${validationResult.error}")
+                }
+                bodyToCache = body
+                metadata = validationResult.metadata ?: BlocklistMetadata()
             }
 
-            // Cache the blocklist
+            // Cache the blocklist (bundles are cached as their merged blocklist)
             context.blocklistDataStore.edit { preferences ->
-                preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)] = body
+                preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)] = bodyToCache
             }
 
             // Update with success status and validated metadata
@@ -235,7 +248,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 lastAttempted = nowIso,
                 status = "active",
                 errorMessage = null,
-                metadata = validationResult.metadata
+                metadata = metadata
             ))
 
             Log.d(TAG, "Refreshed blocklist: ${config.name}")
@@ -249,6 +262,77 @@ class ExternalBlocklistManager(private val context: Context) {
                 ).errorMessage
             ))
         }
+    }
+
+    /**
+     * Resolved bundle—merged groups of all imported blocklists, plus metadata.
+     */
+    private data class ResolvedBundle(
+        val groups: Map<String, BlocklistGroup>,
+        val metadata: BlocklistMetadata
+    )
+
+    /**
+     * Resolve a bundle by fetching and merging all imported blocklists.
+     * Bundles may only import plain blocklists, never other bundles.
+     */
+    private fun resolveBundle(bundleElement: JsonElement, bundleSize: Int): ResolvedBundle {
+        val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement)
+        if (!bundleValidation.valid) {
+            throw Exception("Validation failed: ${bundleValidation.error}")
+        }
+
+        val merged = linkedMapOf<String, BlocklistGroup>()
+        var totalSize = bundleSize
+
+        bundleValidation.imports.forEachIndexed { index, importUrl ->
+            val importBody = try {
+                fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
+            } catch (e: Exception) {
+                throw Exception("Could not load imported blocklist $importUrl: ${e.message}")
+            }
+
+            totalSize += importBody.length
+            if (totalSize > MAX_BLOCKLIST_SIZE) {
+                throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
+            }
+
+            val importElement = json.parseToJsonElement(importBody)
+            if (!BlocklistValidator.validateJsonDepth(importElement)) {
+                throw Exception("JSON structure too deeply nested in imported blocklist $importUrl.")
+            }
+            if (BlocklistValidator.isBundle(importElement)) {
+                throw Exception("Validation failed: Imported blocklist $importUrl is itself a bundle. Bundles may only import plain blocklists.")
+            }
+
+            val importGroups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
+            val importValidation = BlocklistValidator.validateBlocklistFormat(importGroups)
+            if (!importValidation.valid) {
+                throw Exception("Validation failed for imported blocklist $importUrl: ${importValidation.error}")
+            }
+
+            // Prefix group IDs to avoid conflicts between imported blocklists
+            importGroups.forEach { (groupId, group) ->
+                var mergedId = "import${index + 1}_$groupId"
+                var suffix = 2
+                while (merged.containsKey(mergedId)) {
+                    mergedId = "import${index + 1}_${groupId}_$suffix"
+                    suffix++
+                }
+                merged[mergedId] = group
+            }
+        }
+
+        // The merged result must satisfy the same limits as a single blocklist
+        val mergedValidation = BlocklistValidator.validateBlocklistFormat(merged)
+        if (!mergedValidation.valid) {
+            throw Exception("Validation failed for the combined blocklists of this bundle: ${mergedValidation.error}")
+        }
+
+        val metadata = (mergedValidation.metadata ?: BlocklistMetadata()).copy(
+            imports = bundleValidation.imports.size
+        )
+        return ResolvedBundle(merged, metadata)
     }
 
     /**

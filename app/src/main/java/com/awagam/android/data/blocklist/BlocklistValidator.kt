@@ -18,6 +18,9 @@ object BlocklistValidator {
     private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
     private const val MAX_JSON_DEPTH = 20
     private const val MAX_GROUPS = 100
+    // Matches the 100-group blocklist limit, since more (non-empty) imports
+    // could never validate after merging anyway
+    private const val MAX_BUNDLE_IMPORTS = 100
     private const val MAX_NAME_LENGTH = 200
     private const val MAX_URL_LENGTH = 2000
     private const val MAX_ERROR_LENGTH = 500
@@ -119,6 +122,62 @@ object BlocklistValidator {
      */
     fun validateJsonDepth(element: JsonElement): Boolean {
         return getJsonDepth(element) <= MAX_JSON_DEPTH
+    }
+
+    /**
+     * Bundle validation result with the list of import URLs on success.
+     */
+    data class BundleValidationResult(
+        val valid: Boolean,
+        val error: String? = null,
+        val imports: List<String> = emptyList()
+    )
+
+    /**
+     * Detect the AWAGAM bundle format (an object whose “imports” field is an array).
+     * Matches browser extension detection logic.
+     */
+    fun isBundle(element: JsonElement): Boolean {
+        return element is JsonObject && element["imports"] is JsonArray
+    }
+
+    /**
+     * Validate AWAGAM bundle format.
+     * A bundle contains only the “imports” field with 1–20 unique HTTPS URLs.
+     */
+    fun validateBundleFormat(element: JsonElement): BundleValidationResult {
+        if (!isBundle(element)) {
+            return BundleValidationResult(false, "A bundle must be an object with an \"imports\" array")
+        }
+
+        val obj = element as JsonObject
+        val extraKeys = obj.keys.filter { it != "imports" }
+        if (extraKeys.isNotEmpty()) {
+            return BundleValidationResult(false, "A bundle must contain only the \"imports\" field (found: ${extraKeys.joinToString(", ")})")
+        }
+
+        val importsArray = obj["imports"] as JsonArray
+        if (importsArray.isEmpty()) {
+            return BundleValidationResult(false, "\"imports\" must contain at least one URL")
+        }
+        if (importsArray.size > MAX_BUNDLE_IMPORTS) {
+            return BundleValidationResult(false, "Too many imports (max $MAX_BUNDLE_IMPORTS)")
+        }
+
+        val urls = mutableListOf<String>()
+        for (item in importsArray) {
+            val url = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: return BundleValidationResult(false, "\"imports\" contains a non-string entry")
+            if (url.length > MAX_URL_LENGTH || !isValidBlocklistUrl(url)) {
+                return BundleValidationResult(false, "Invalid or insecure import URL: $url")
+            }
+            if (url in urls) {
+                return BundleValidationResult(false, "Duplicate import URL: $url")
+            }
+            urls.add(url)
+        }
+
+        return BundleValidationResult(true, imports = urls)
     }
 
     /**
