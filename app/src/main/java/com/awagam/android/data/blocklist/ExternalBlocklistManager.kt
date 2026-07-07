@@ -325,6 +325,11 @@ class ExternalBlocklistManager(private val context: Context) {
                 }
                 merged[mergedId] = group
             }
+
+            // Fail fast—once the group limit is exceeded, further imports can’t make the merged result validate
+            if (merged.size > BlocklistValidator.MAX_GROUPS) {
+                throw Exception("Validation failed for the combined blocklists of this bundle: Too many groups (max ${BlocklistValidator.MAX_GROUPS})")
+            }
         }
 
         // The merged result must satisfy the same limits as a single blocklist

@@ -17,7 +17,7 @@ object BlocklistValidator {
     // Limits matching browser extension
     private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
     private const val MAX_JSON_DEPTH = 20
-    private const val MAX_GROUPS = 100
+    const val MAX_GROUPS = 100
     // Matches the 100-group blocklist limit, since more (non-empty) imports
     // could never validate after merging anyway
     private const val MAX_BUNDLE_IMPORTS = 100
@@ -175,7 +175,9 @@ object BlocklistValidator {
             val url = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
                 ?: return BundleValidationResult(false, "\"imports\" contains a non-string entry")
             val normalizedUrl = normalizeUrl(url)
-            if (url.length > MAX_URL_LENGTH || !isValidBlocklistUrl(normalizedUrl)) {
+            if (url.length > MAX_URL_LENGTH ||
+                normalizedUrl.length > MAX_URL_LENGTH ||
+                !isValidBlocklistUrl(normalizedUrl)) {
                 return BundleValidationResult(false, "Invalid or insecure import URL: $url")
             }
             if (!seenUrls.add(normalizedUrl)) {
