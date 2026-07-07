@@ -244,6 +244,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
             val bodyToCache: String
             val metadata: BlocklistMetadata
+            var warning: String? = null
 
             if (BlocklistValidator.isBundle(jsonElement)) {
                 // Bundles reference other blocklists instead of containing rules
@@ -254,6 +255,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     throw Exception("Bundle too large. The merged blocklist exceeds 10 MB.")
                 }
                 metadata = resolved.metadata
+                warning = resolved.warning
             } else {
                 // Parse into blocklist groups
                 val groups: Map<String, BlocklistGroup> = json.decodeFromString(body)
@@ -272,12 +274,15 @@ class ExternalBlocklistManager(private val context: Context) {
                 preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)] = bodyToCache
             }
 
-            // Update with success status and validated metadata
+            // Update with success status and validated metadata; bundles with
+            // skipped imports stay active but carry a warning naming them
             updateBlocklist(config.copy(
                 lastUpdated = nowIso,
                 lastAttempted = nowIso,
-                status = "active",
-                errorMessage = null,
+                status = if (warning != null) "warning" else "active",
+                errorMessage = warning?.let {
+                    BlocklistValidator.sanitizeConfig(config.copy(errorMessage = it)).errorMessage
+                },
                 metadata = metadata
             ))
 
@@ -295,16 +300,20 @@ class ExternalBlocklistManager(private val context: Context) {
     }
 
     /**
-     * Resolved bundle—merged groups of all imported blocklists, plus metadata.
+     * Resolved bundle—merged groups of all imported blocklists, plus metadata
+     * and an optional warning naming skipped imports.
      */
     private data class ResolvedBundle(
         val groups: Map<String, BlocklistGroup>,
-        val metadata: BlocklistMetadata
+        val metadata: BlocklistMetadata,
+        val warning: String? = null
     )
 
     /**
      * Resolve a bundle by fetching and merging all imported blocklists.
-     * Bundles may only import plain blocklists, never other bundles.
+     * Imports that fail to load or validate are skipped with a warning; the
+     * refresh fails only if no import can be loaded, or if the merged result
+     * exceeds the blocklist limits.
      */
     private fun resolveBundle(bundleElement: JsonElement, bundleSize: Int): ResolvedBundle {
         val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement) { convertToRawUrl(it) }
@@ -313,13 +322,16 @@ class ExternalBlocklistManager(private val context: Context) {
         }
 
         val merged = linkedMapOf<String, BlocklistGroup>()
+        val failures = mutableListOf<String>()
         var totalSize = bundleSize
+        var importsLoaded = 0
 
         bundleValidation.imports.forEachIndexed { index, importUrl ->
             val importBody = try {
                 fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
             } catch (e: Exception) {
-                throw Exception("Could not load imported blocklist $importUrl: ${e.message}")
+                failures.add("$importUrl (${e.message})")
+                return@forEachIndexed
             }
 
             totalSize += importBody.length
@@ -327,21 +339,35 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
             }
 
-            val importElement = json.parseToJsonElement(importBody)
-            if (!BlocklistValidator.validateJsonDepth(importElement)) {
-                throw Exception("JSON structure too deeply nested in imported blocklist $importUrl.")
-            }
-            if (BlocklistValidator.isBundle(importElement)) {
-                throw Exception("Validation failed: Imported blocklist $importUrl is itself a bundle. Bundles may only import plain blocklists.")
+            // Validate the member; failures skip it, they don’t fail the bundle
+            val importGroups: Map<String, BlocklistGroup>? = try {
+                val importElement = json.parseToJsonElement(importBody)
+                if (!BlocklistValidator.validateJsonDepth(importElement)) {
+                    throw Exception("JSON structure too deeply nested")
+                }
+                if (BlocklistValidator.isBundle(importElement)) {
+                    throw Exception("is itself a bundle—bundles may only import plain blocklists")
+                }
+                val groups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
+                val validation = BlocklistValidator.validateBlocklistFormat(groups)
+                if (!validation.valid) {
+                    throw Exception(validation.error)
+                }
+                groups
+            } catch (e: Exception) {
+                failures.add("$importUrl (${e.message})")
+                null
             }
 
-            val importGroups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
-            val importValidation = BlocklistValidator.validateBlocklistFormat(importGroups)
-            if (!importValidation.valid) {
-                throw Exception("Validation failed for imported blocklist $importUrl: ${importValidation.error}")
+            if (importGroups != null) {
+                // Group-limit failures inside the merge stay fatal
+                mergeImportedGroups(merged, importGroups, index)
+                importsLoaded++
             }
+        }
 
-            mergeImportedGroups(merged, importGroups, index)
+        if (importsLoaded == 0) {
+            throw Exception("None of the imported blocklists could be loaded: ${failures.joinToString("; ")}")
         }
 
         // The merged result must satisfy the same limits as a single blocklist
@@ -351,9 +377,15 @@ class ExternalBlocklistManager(private val context: Context) {
         }
 
         val metadata = (mergedValidation.metadata ?: BlocklistMetadata()).copy(
-            imports = bundleValidation.imports.size
+            imports = bundleValidation.imports.size,
+            importsLoaded = importsLoaded
         )
-        return ResolvedBundle(merged, metadata)
+        val warning = if (failures.isNotEmpty()) {
+            "${failures.size} of ${bundleValidation.imports.size} imported blocklists could not be loaded: ${failures.joinToString("; ")}"
+        } else {
+            null
+        }
+        return ResolvedBundle(merged, metadata, warning)
     }
 
     /**

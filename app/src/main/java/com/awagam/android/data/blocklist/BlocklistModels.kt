@@ -38,7 +38,8 @@ data class BlocklistMetadata(
     val domains: Int = 0,
     val urls: Int = 0,
     val groups: Int = 0,
-    val imports: Int = 0
+    val imports: Int = 0,
+    val importsLoaded: Int = 0
 )
 
 /**
