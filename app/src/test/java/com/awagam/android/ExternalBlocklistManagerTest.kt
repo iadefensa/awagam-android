@@ -237,4 +237,17 @@ class ExternalBlocklistManagerTest {
             assertTrue(e.message!!.contains("Bundle too large"))
         }
     }
+
+    @Test
+    fun `bundle size is counted in UTF-8 bytes`() {
+        // “Ä” is one UTF-16 unit but two UTF-8 bytes—a character-based count would pass this bundle
+        val member = """{"ads": {"name": "Äds", "domains": ["ads.example.com"]}}"""
+        val bundle = bundleOf("https://a.example/ok.json")
+        try {
+            ExternalBlocklistManager.resolveBundle(bundle, 10 * 1024 * 1024 - member.length) { member }
+            fail("Expected resolution to fail")
+        } catch (e: Exception) {
+            assertTrue(e.message!!.contains("Bundle too large"))
+        }
+    }
 }

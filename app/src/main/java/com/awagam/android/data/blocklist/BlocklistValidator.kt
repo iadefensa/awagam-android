@@ -85,7 +85,14 @@ object BlocklistValidator {
      * Validate blocklist size.
      */
     fun validateSize(content: String): Boolean {
-        return content.length <= MAX_BLOCKLIST_SIZE
+        return utf8Size(content) <= MAX_BLOCKLIST_SIZE
+    }
+
+    /**
+     * UTF-8 byte size of a string—the size limit is a byte limit, not a character count.
+     */
+    fun utf8Size(content: String): Int {
+        return content.toByteArray(Charsets.UTF_8).size
     }
 
     /**

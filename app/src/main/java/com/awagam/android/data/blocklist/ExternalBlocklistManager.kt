@@ -142,7 +142,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     return@forEachIndexed
                 }
 
-                totalSize += importBody.length
+                totalSize += BlocklistValidator.utf8Size(importBody)
                 if (totalSize > MAX_BLOCKLIST_SIZE) {
                     throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
                 }
@@ -342,7 +342,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
             if (BlocklistValidator.isBundle(jsonElement)) {
                 // Bundles reference other blocklists instead of containing rules
-                val resolved = resolveBundle(jsonElement, body.length) { importUrl ->
+                val resolved = resolveBundle(jsonElement, BlocklistValidator.utf8Size(body)) { importUrl ->
                     fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
                 }
                 bodyToCache = json.encodeToString(resolved.groups)
