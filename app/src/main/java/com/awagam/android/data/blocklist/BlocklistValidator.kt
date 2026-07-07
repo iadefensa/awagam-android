@@ -174,7 +174,11 @@ object BlocklistValidator {
         for (item in importsArray) {
             val url = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
                 ?: return BundleValidationResult(false, "\"imports\" contains a non-string entry")
-            val normalizedUrl = normalizeUrl(url)
+            val normalizedUrl = try {
+                normalizeUrl(url)
+            } catch (e: Exception) {
+                return BundleValidationResult(false, "Invalid import URL $url: ${e.message}")
+            }
             if (url.length > MAX_URL_LENGTH ||
                 normalizedUrl.length > MAX_URL_LENGTH ||
                 !isValidBlocklistUrl(normalizedUrl)) {

@@ -70,6 +70,32 @@ class ExternalBlocklistManager(private val context: Context) {
 
             return url
         }
+
+        /**
+         * Merge one imported blocklist’s groups into the accumulated bundle result.
+         * Group IDs are prefixed per import to avoid conflicts. Fails fast once the
+         * group limit is exceeded, since further imports can’t make the merged
+         * result validate.
+         */
+        internal fun mergeImportedGroups(
+            merged: MutableMap<String, BlocklistGroup>,
+            importGroups: Map<String, BlocklistGroup>,
+            index: Int
+        ) {
+            importGroups.forEach { (groupId, group) ->
+                var mergedId = "import${index + 1}_$groupId"
+                var suffix = 2
+                while (merged.containsKey(mergedId)) {
+                    mergedId = "import${index + 1}_${groupId}_$suffix"
+                    suffix++
+                }
+                merged[mergedId] = group
+            }
+
+            if (merged.size > BlocklistValidator.MAX_GROUPS) {
+                throw Exception("Validation failed for the combined blocklists of this bundle: Too many groups (max ${BlocklistValidator.MAX_GROUPS})")
+            }
+        }
     }
 
     private val json = Json {
@@ -315,21 +341,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("Validation failed for imported blocklist $importUrl: ${importValidation.error}")
             }
 
-            // Prefix group IDs to avoid conflicts between imported blocklists
-            importGroups.forEach { (groupId, group) ->
-                var mergedId = "import${index + 1}_$groupId"
-                var suffix = 2
-                while (merged.containsKey(mergedId)) {
-                    mergedId = "import${index + 1}_${groupId}_$suffix"
-                    suffix++
-                }
-                merged[mergedId] = group
-            }
-
-            // Fail fast—once the group limit is exceeded, further imports can’t make the merged result validate
-            if (merged.size > BlocklistValidator.MAX_GROUPS) {
-                throw Exception("Validation failed for the combined blocklists of this bundle: Too many groups (max ${BlocklistValidator.MAX_GROUPS})")
-            }
+            mergeImportedGroups(merged, importGroups, index)
         }
 
         // The merged result must satisfy the same limits as a single blocklist
