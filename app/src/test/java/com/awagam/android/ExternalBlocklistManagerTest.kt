@@ -2,6 +2,7 @@ package com.awagam.android
 
 import com.awagam.android.data.blocklist.BlocklistGroup
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -163,5 +164,77 @@ class ExternalBlocklistManagerTest {
         ExternalBlocklistManager.mergeImportedGroups(merged, (1..50).associate { "g$it" to group("G$it") }, 0)
         ExternalBlocklistManager.mergeImportedGroups(merged, (1..50).associate { "g$it" to group("G$it") }, 1)
         assertEquals(100, merged.size)
+    }
+
+    // Bundle Resolution
+
+    private fun bundleOf(vararg urls: String) = Json.parseToJsonElement(
+        """{"imports": [${urls.joinToString(",") { "\"$it\"" }}]}"""
+    )
+
+    private val memberJson = """{"ads": {"name": "Ads", "domains": ["ads.example.com"]}}"""
+
+    @Test
+    fun `failing imports are skipped with a warning`() {
+        val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/dead.json", "https://a.example/ok2.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            if (url.contains("dead")) throw Exception("HTTP 404") else memberJson
+        }
+        assertEquals(3, resolved.metadata.imports)
+        assertEquals(2, resolved.metadata.importsLoaded)
+        assertEquals(setOf("import1_ads", "import3_ads"), resolved.groups.keys.toSet())
+        assertTrue(resolved.warning!!.startsWith("1 of 3 imported blocklists could not be loaded"))
+        assertTrue(resolved.warning!!.contains("dead.json"))
+    }
+
+    @Test
+    fun `resolution fails when no import can be loaded`() {
+        val bundle = bundleOf("https://a.example/d1.json", "https://a.example/d2.json")
+        try {
+            ExternalBlocklistManager.resolveBundle(bundle, 100) { throw Exception("HTTP 404") }
+            fail("Expected resolution to fail")
+        } catch (e: Exception) {
+            assertTrue(e.message!!.contains("None of the imported blocklists could be loaded"))
+        }
+    }
+
+    @Test
+    fun `nested bundles are skipped with a warning`() {
+        val bundle = bundleOf("https://a.example/nested.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            if (url.contains("nested")) """{"imports": ["https://x.example/y.json"]}""" else memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("is itself a bundle"))
+    }
+
+    @Test
+    fun `invalid member JSON is skipped with a warning`() {
+        val bundle = bundleOf("https://a.example/bad.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            if (url.contains("bad")) "{invalid" else memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("bad.json"))
+    }
+
+    @Test
+    fun `healthy bundles resolve without warning`() {
+        val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/ok2.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
+        assertEquals(null, resolved.warning)
+        assertEquals(2, resolved.metadata.importsLoaded)
+        assertEquals(2, resolved.metadata.totalRules)
+    }
+
+    @Test
+    fun `resolution fails when the combined size limit is exceeded`() {
+        val bundle = bundleOf("https://a.example/ok.json")
+        try {
+            ExternalBlocklistManager.resolveBundle(bundle, 10 * 1024 * 1024 - 10) { memberJson }
+            fail("Expected resolution to fail")
+        } catch (e: Exception) {
+            assertTrue(e.message!!.contains("Bundle too large"))
+        }
     }
 }

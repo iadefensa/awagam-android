@@ -364,12 +364,11 @@ object BlocklistValidator {
     }
 
     /**
-     * Sanitize a string by limiting length and stripping HTML.
+     * Sanitize a string by stripping HTML and limiting length, with an ellipsis when truncated.
      */
     private fun sanitizeString(input: String, maxLength: Int): String {
-        return input
-            .take(maxLength)
-            .replace(Regex("[<>]"), "") // Strip HTML tags
+        val stripped = input.replace(Regex("[<>]"), "") // Strip HTML tags
+        return if (stripped.length > maxLength) stripped.take(maxLength - 1) + "…" else stripped
     }
 
     /**

@@ -96,11 +96,105 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("Validation failed for the combined blocklists of this bundle: Too many groups (max ${BlocklistValidator.MAX_GROUPS})")
             }
         }
-    }
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
+        private val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+
+        /**
+         * Resolved bundle—merged groups of all imported blocklists, plus metadata
+         * and an optional warning naming skipped imports.
+         */
+        internal data class ResolvedBundle(
+            val groups: Map<String, BlocklistGroup>,
+            val metadata: BlocklistMetadata,
+            val warning: String? = null
+        )
+
+        /**
+         * Resolve a bundle by fetching and merging all imported blocklists.
+         * Imports that fail to load or validate are skipped with a warning; the
+         * refresh fails only if no import can be loaded, or if the merged result
+         * exceeds the blocklist limits. Fetching is injected so the resolution
+         * logic can be tested without a network.
+         */
+        internal fun resolveBundle(
+            bundleElement: JsonElement,
+            bundleSize: Int,
+            fetchImport: (String) -> String
+        ): ResolvedBundle {
+            val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement) { convertToRawUrl(it) }
+            if (!bundleValidation.valid) {
+                throw Exception("Validation failed: ${bundleValidation.error}")
+            }
+
+            val merged = linkedMapOf<String, BlocklistGroup>()
+            val failures = mutableListOf<String>()
+            var totalSize = bundleSize
+            var importsLoaded = 0
+
+            bundleValidation.imports.forEachIndexed { index, importUrl ->
+                val importBody = try {
+                    fetchImport(importUrl)
+                } catch (e: Exception) {
+                    failures.add("$importUrl (${e.message})")
+                    return@forEachIndexed
+                }
+
+                totalSize += importBody.length
+                if (totalSize > MAX_BLOCKLIST_SIZE) {
+                    throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
+                }
+
+                // Validate the member; failures skip it, they don’t fail the bundle
+                val importGroups: Map<String, BlocklistGroup>? = try {
+                    val importElement = json.parseToJsonElement(importBody)
+                    if (!BlocklistValidator.validateJsonDepth(importElement)) {
+                        throw Exception("JSON structure too deeply nested")
+                    }
+                    if (BlocklistValidator.isBundle(importElement)) {
+                        throw Exception("is itself a bundle—bundles may only import plain blocklists")
+                    }
+                    val groups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
+                    val validation = BlocklistValidator.validateBlocklistFormat(groups)
+                    if (!validation.valid) {
+                        throw Exception(validation.error)
+                    }
+                    groups
+                } catch (e: Exception) {
+                    failures.add("$importUrl (${e.message})")
+                    null
+                }
+
+                if (importGroups != null) {
+                    // Group-limit failures inside the merge stay fatal
+                    mergeImportedGroups(merged, importGroups, index)
+                    importsLoaded++
+                }
+            }
+
+            if (importsLoaded == 0) {
+                throw Exception("None of the imported blocklists could be loaded: ${failures.joinToString("; ")}")
+            }
+
+            // The merged result must satisfy the same limits as a single blocklist
+            val mergedValidation = BlocklistValidator.validateBlocklistFormat(merged)
+            if (!mergedValidation.valid) {
+                throw Exception("Validation failed for the combined blocklists of this bundle: ${mergedValidation.error}")
+            }
+
+            val metadata = (mergedValidation.metadata ?: BlocklistMetadata()).copy(
+                imports = bundleValidation.imports.size,
+                importsLoaded = importsLoaded
+            )
+            val warning = if (failures.isNotEmpty()) {
+                "${failures.size} of ${bundleValidation.imports.size} imported blocklists could not be loaded: ${failures.joinToString("; ")}"
+            } else {
+                null
+            }
+            return ResolvedBundle(merged, metadata, warning)
+        }
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -248,7 +342,9 @@ class ExternalBlocklistManager(private val context: Context) {
 
             if (BlocklistValidator.isBundle(jsonElement)) {
                 // Bundles reference other blocklists instead of containing rules
-                val resolved = resolveBundle(jsonElement, body.length)
+                val resolved = resolveBundle(jsonElement, body.length) { importUrl ->
+                    fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
+                }
                 bodyToCache = json.encodeToString(resolved.groups)
                 // Guard the cache as well—group ID prefixes can grow the merged result past the fetched sizes
                 if (!BlocklistValidator.validateSize(bodyToCache)) {
@@ -297,95 +393,6 @@ class ExternalBlocklistManager(private val context: Context) {
                 ).errorMessage
             ))
         }
-    }
-
-    /**
-     * Resolved bundle—merged groups of all imported blocklists, plus metadata
-     * and an optional warning naming skipped imports.
-     */
-    private data class ResolvedBundle(
-        val groups: Map<String, BlocklistGroup>,
-        val metadata: BlocklistMetadata,
-        val warning: String? = null
-    )
-
-    /**
-     * Resolve a bundle by fetching and merging all imported blocklists.
-     * Imports that fail to load or validate are skipped with a warning; the
-     * refresh fails only if no import can be loaded, or if the merged result
-     * exceeds the blocklist limits.
-     */
-    private fun resolveBundle(bundleElement: JsonElement, bundleSize: Int): ResolvedBundle {
-        val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement) { convertToRawUrl(it) }
-        if (!bundleValidation.valid) {
-            throw Exception("Validation failed: ${bundleValidation.error}")
-        }
-
-        val merged = linkedMapOf<String, BlocklistGroup>()
-        val failures = mutableListOf<String>()
-        var totalSize = bundleSize
-        var importsLoaded = 0
-
-        bundleValidation.imports.forEachIndexed { index, importUrl ->
-            val importBody = try {
-                fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
-            } catch (e: Exception) {
-                failures.add("$importUrl (${e.message})")
-                return@forEachIndexed
-            }
-
-            totalSize += importBody.length
-            if (totalSize > MAX_BLOCKLIST_SIZE) {
-                throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
-            }
-
-            // Validate the member; failures skip it, they don’t fail the bundle
-            val importGroups: Map<String, BlocklistGroup>? = try {
-                val importElement = json.parseToJsonElement(importBody)
-                if (!BlocklistValidator.validateJsonDepth(importElement)) {
-                    throw Exception("JSON structure too deeply nested")
-                }
-                if (BlocklistValidator.isBundle(importElement)) {
-                    throw Exception("is itself a bundle—bundles may only import plain blocklists")
-                }
-                val groups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
-                val validation = BlocklistValidator.validateBlocklistFormat(groups)
-                if (!validation.valid) {
-                    throw Exception(validation.error)
-                }
-                groups
-            } catch (e: Exception) {
-                failures.add("$importUrl (${e.message})")
-                null
-            }
-
-            if (importGroups != null) {
-                // Group-limit failures inside the merge stay fatal
-                mergeImportedGroups(merged, importGroups, index)
-                importsLoaded++
-            }
-        }
-
-        if (importsLoaded == 0) {
-            throw Exception("None of the imported blocklists could be loaded: ${failures.joinToString("; ")}")
-        }
-
-        // The merged result must satisfy the same limits as a single blocklist
-        val mergedValidation = BlocklistValidator.validateBlocklistFormat(merged)
-        if (!mergedValidation.valid) {
-            throw Exception("Validation failed for the combined blocklists of this bundle: ${mergedValidation.error}")
-        }
-
-        val metadata = (mergedValidation.metadata ?: BlocklistMetadata()).copy(
-            imports = bundleValidation.imports.size,
-            importsLoaded = importsLoaded
-        )
-        val warning = if (failures.isNotEmpty()) {
-            "${failures.size} of ${bundleValidation.imports.size} imported blocklists could not be loaded: ${failures.joinToString("; ")}"
-        } else {
-            null
-        }
-        return ResolvedBundle(merged, metadata, warning)
     }
 
     /**
