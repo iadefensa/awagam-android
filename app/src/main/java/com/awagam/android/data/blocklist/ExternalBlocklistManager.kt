@@ -70,19 +70,26 @@ class ExternalBlocklistManager(private val context: Context) {
         private val TOTAL_REFRESH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(8)
 
         internal fun convertToRawUrl(url: String): String {
-            val hostLower = try { java.net.URI(url).host?.lowercase() } catch (e: Exception) { null } ?: return url
+            val uri = try { java.net.URI(url) } catch (e: Exception) { return url }
+            val hostLower = uri.host?.lowercase() ?: return url
 
-            if (hostLower == "github.com" && url.contains("/blob/")) {
-                return url
-                    .replace("://github.com/", "://raw.githubusercontent.com/", ignoreCase = true)
-                    .replace("/blob/", "/")
-            }
-
-            // GitHub tree URLs point to directories, not files—rejecting them here
-            // gives a clearer message than the fetch failure they’d produce later
-            // (matches AWAGAM Chromium’s `convertToRawUrl`)
-            if (hostLower == "github.com" && url.contains("/tree/")) {
-                throw Exception("Directory URLs are not supported. Please link to a specific file.")
+            if (hostLower == "github.com") {
+                // The URL kind is the third path segment—“/owner/repo/blob/…” is a
+                // file page, “/owner/repo/tree/…” a directory; matching “/tree/”
+                // anywhere in the URL would falsely reject file paths that merely
+                // contain such a segment
+                val kind = uri.path?.split("/")?.getOrNull(3)
+                if (kind == "blob") {
+                    return url
+                        .replaceFirst("://github.com/", "://raw.githubusercontent.com/", ignoreCase = true)
+                        .replaceFirst("/blob/", "/")
+                }
+                // Directories aren’t fetchable files—rejecting them here gives a
+                // clearer message than the fetch failure they’d produce later
+                // (matches AWAGAM Chromium’s `convertToRawUrl`)
+                if (kind == "tree") {
+                    throw Exception("Directory URLs are not supported. Please link to a specific file.")
+                }
             }
 
             if (hostLower == "gitlab.com" && url.contains("/-/blob/")) {
@@ -171,6 +178,9 @@ class ExternalBlocklistManager(private val context: Context) {
             retryBackoffUnit: Long = TimeUnit.SECONDS.toMillis(1),
             fetchImport: (String) -> String
         ): ResolvedBundle {
+            // Fail clearly instead of letting `chunked()` throw mid-resolution
+            require(concurrency > 0) { "concurrency must be positive" }
+
             // Only structural problems are fatal—per-URL problems are skipped below
             val structureValidation = BlocklistValidator.validateBundleStructure(bundleElement)
             if (!structureValidation.valid) {
