@@ -186,8 +186,11 @@ object BlocklistValidator {
             } catch (e: Exception) {
                 return BundleValidationResult(false, "Invalid import URL $url: ${e.message}")
             }
+            // Validate the original URL too—a normalizer must not be able to
+            // turn an insecure URL into an acceptable one
             if (url.length > MAX_URL_LENGTH ||
                 normalizedUrl.length > MAX_URL_LENGTH ||
+                !isValidBlocklistUrl(url) ||
                 !isValidBlocklistUrl(normalizedUrl)) {
                 return BundleValidationResult(false, "Invalid or insecure import URL: $url")
             }
@@ -371,10 +374,11 @@ object BlocklistValidator {
     }
 
     /**
-     * Sanitize a string by stripping HTML and limiting length, with an ellipsis when truncated.
+     * Sanitize a string by removing angle brackets (so it can’t carry HTML tags)
+     * and limiting length, with an ellipsis when truncated.
      */
     private fun sanitizeString(input: String, maxLength: Int): String {
-        val stripped = input.replace(Regex("[<>]"), "") // Strip HTML tags
+        val stripped = input.replace(Regex("[<>]"), "")
         return if (stripped.length > maxLength) stripped.take(maxLength - 1) + "…" else stripped
     }
 

@@ -112,6 +112,15 @@ class BlocklistValidatorTest {
     }
 
     @Test
+    fun `bundles with insecure import URLs are rejected even if normalization would fix them`() {
+        val bundle = Json.parseToJsonElement("""{"imports": ["http://example.com/a.json"]}""")
+        val result = BlocklistValidator.validateBundleFormat(bundle) {
+            it.replace("http://", "https://")
+        }
+        assertFalse(result.valid)
+    }
+
+    @Test
     fun `bundles with duplicate import URLs are rejected`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json", "https://example.com/a.json"]}"""
