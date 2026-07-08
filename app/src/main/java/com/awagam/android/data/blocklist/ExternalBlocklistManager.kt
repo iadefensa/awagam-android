@@ -137,6 +137,8 @@ class ExternalBlocklistManager(private val context: Context) {
         internal suspend fun resolveBundle(
             bundleElement: JsonElement,
             bundleSize: Int,
+            concurrency: Int = BUNDLE_FETCH_CONCURRENCY,
+            timeBudgetMs: Long = BUNDLE_FETCH_TIME_BUDGET_MS,
             fetchImport: (String) -> String
         ): ResolvedBundle {
             // Only structural problems are fatal—per-URL problems are skipped below
@@ -163,9 +165,9 @@ class ExternalBlocklistManager(private val context: Context) {
             // up; the overall deadline bounds the worst case regardless, by skipping
             // any batch that hasn’t started once the budget runs out
             val toFetch = entries.filter { it.fetchUrl != null }
-            val deadline = System.currentTimeMillis() + BUNDLE_FETCH_TIME_BUDGET_MS
+            val deadline = System.currentTimeMillis() + timeBudgetMs
             coroutineScope {
-                for (batch in toFetch.chunked(BUNDLE_FETCH_CONCURRENCY)) {
+                for (batch in toFetch.chunked(concurrency)) {
                     if (System.currentTimeMillis() >= deadline) {
                         batch.forEach { it.failure = "${it.importUrl} (timed out)" }
                         continue

@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Unit tests for `ExternalBlocklistManager.convertToRawUrl` and `mergeImportedGroups`.
@@ -290,6 +291,40 @@ class ExternalBlocklistManagerTest {
         } catch (e: Exception) {
             assertTrue(e.message!!.contains("Bundle too large"))
         }
+    }
+
+    @Test
+    fun `imports are fetched concurrently, not one at a time`() = runTest {
+        val bundle = bundleOf(
+            "https://a.example/c1.json", "https://a.example/c2.json", "https://a.example/c3.json",
+            "https://a.example/c4.json", "https://a.example/c5.json"
+        )
+        val inFlight = AtomicInteger(0)
+        val maxInFlight = AtomicInteger(0)
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, concurrency = 5) {
+            val current = inFlight.incrementAndGet()
+            maxInFlight.updateAndGet { max -> maxOf(max, current) }
+            Thread.sleep(80)
+            inFlight.decrementAndGet()
+            memberJson
+        }
+        assertEquals(5, resolved.metadata.importsLoaded)
+        // If fetches ran one at a time, max in-flight would be 1
+        assertTrue("expected concurrent fetches, saw max in-flight = ${maxInFlight.get()}", maxInFlight.get() > 1)
+        assertTrue("concurrency cap of 5 was exceeded: ${maxInFlight.get()}", maxInFlight.get() <= 5)
+    }
+
+    @Test
+    fun `imports past the deadline are skipped as timed out`() = runTest {
+        val bundle = bundleOf("https://a.example/slow1.json", "https://a.example/slow2.json")
+        // “concurrency = 1” forces two sequential batches; the first eats the whole
+        // budget, so the deadline check before the second batch should skip it
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, concurrency = 1, timeBudgetMs = 50) {
+            Thread.sleep(150)
+            memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("timed out"))
     }
 
     @Test
