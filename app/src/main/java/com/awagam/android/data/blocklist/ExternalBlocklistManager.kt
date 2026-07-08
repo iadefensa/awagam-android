@@ -149,9 +149,16 @@ class ExternalBlocklistManager(private val context: Context) {
                 }
 
                 val importBody = try {
-                    fetchImport(importUrl)
+                    fetchImport(urlValidation.normalizedUrl)
                 } catch (e: Exception) {
-                    failures.add("$importUrl (${e.message})")
+                    failures.add("$importUrl (${e.message ?: e.javaClass.simpleName})")
+                    return@forEachIndexed
+                }
+
+                // Reject oversized bodies before parsing them
+                val importSize = BlocklistValidator.utf8Size(importBody)
+                if (importSize > MAX_BLOCKLIST_SIZE) {
+                    failures.add("$importUrl (Blocklist too large. Maximum size is 10 MB.)")
                     return@forEachIndexed
                 }
 
@@ -171,14 +178,14 @@ class ExternalBlocklistManager(private val context: Context) {
                     }
                     groups
                 } catch (e: Exception) {
-                    failures.add("$importUrl (${e.message})")
+                    failures.add("$importUrl (${e.message ?: e.javaClass.simpleName})")
                     null
                 }
 
                 if (importGroups != null) {
                     // Only imports that contribute rules count toward the combined size
                     // limit—a skipped import must not be able to fail the bundle
-                    totalSize += BlocklistValidator.utf8Size(importBody)
+                    totalSize += importSize
                     if (totalSize > MAX_BLOCKLIST_SIZE) {
                         throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
                     }
@@ -356,8 +363,9 @@ class ExternalBlocklistManager(private val context: Context) {
 
             if (BlocklistValidator.isBundle(jsonElement)) {
                 // Bundles reference other blocklists instead of containing rules
+                // `resolveBundle` passes already-normalized import URLs
                 val resolved = resolveBundle(jsonElement, BlocklistValidator.utf8Size(body)) { importUrl ->
-                    fetchWithFallbacks(convertToRawUrl(importUrl), importUrl)
+                    fetchWithFallbacks(importUrl, importUrl)
                 }
                 bodyToCache = json.encodeToString(resolved.groups)
                 // Guard the cache as well—group ID prefixes can grow the merged result past the fetched sizes
@@ -501,6 +509,12 @@ class ExternalBlocklistManager(private val context: Context) {
 
         httpClient.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
+                // Reject oversized responses before reading the body into memory
+                // (“-1” means the length is unknown—then the post-download checks apply)
+                val contentLength = response.body?.contentLength() ?: -1L
+                if (contentLength > MAX_BLOCKLIST_SIZE) {
+                    throw Exception("Blocklist too large. Maximum size is 10 MB.")
+                }
                 val body = response.body?.string()
                 // Check if we got HTML instead of JSON (common error)
                 if (body != null && body.trimStart().startsWith("<!DOCTYPE") || body?.trimStart()?.startsWith("<html") == true) {

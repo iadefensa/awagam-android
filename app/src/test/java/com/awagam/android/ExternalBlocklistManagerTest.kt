@@ -206,6 +206,29 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
+    fun `oversized imports are skipped before parsing`() {
+        val huge = "x".repeat(10 * 1024 * 1024 + 1)
+        val bundle = bundleOf("https://a.example/huge.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            if (url.contains("huge")) huge else memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("too large"))
+    }
+
+    @Test
+    fun `imports are fetched via their normalized URL`() {
+        val bundle = bundleOf("https://github.com/user/repo/blob/main/list.json")
+        var fetchedUrl: String? = null
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            fetchedUrl = url
+            memberJson
+        }
+        assertEquals("https://raw.githubusercontent.com/user/repo/main/list.json", fetchedUrl)
+        assertEquals(1, resolved.metadata.importsLoaded)
+    }
+
+    @Test
     fun `skipped imports do not count toward the combined size limit`() {
         // An invalid member almost as large as the limit—if its size counted, the valid import would push the bundle over
         val bigInvalid = "x".repeat(10 * 1024 * 1024 - 50)

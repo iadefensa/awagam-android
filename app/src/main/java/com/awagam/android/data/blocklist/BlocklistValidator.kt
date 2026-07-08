@@ -204,7 +204,7 @@ object BlocklistValidator {
         val normalizedUrl = try {
             normalizeUrl(url)
         } catch (e: Exception) {
-            return ImportUrlValidationResult(false, e.message)
+            return ImportUrlValidationResult(false, e.message ?: "Invalid import URL")
         }
         if (url.length > MAX_URL_LENGTH || normalizedUrl.length > MAX_URL_LENGTH) {
             return ImportUrlValidationResult(false, "Import URL too long (max $MAX_URL_LENGTH characters)")
