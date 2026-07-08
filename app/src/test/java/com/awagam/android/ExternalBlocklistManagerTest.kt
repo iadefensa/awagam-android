@@ -315,11 +315,31 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
+    fun `a hanging import is interrupted at the fetch timeout, not left to run`() = runTest {
+        val bundle = bundleOf("https://a.example/hang.json", "https://a.example/ok.json")
+        val start = System.currentTimeMillis()
+        val resolved = ExternalBlocklistManager.resolveBundle(
+            bundle, 100, concurrency = 2, importFetchTimeoutMs = 50
+        ) { url ->
+            if (url.contains("hang")) {
+                Thread.sleep(2000) // would dominate the test unless actually interrupted
+            }
+            memberJson
+        }
+        val elapsed = System.currentTimeMillis() - start
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("timed out"))
+        // Two attempts at ~50ms each (with the one retry) should finish in well under
+        // the 2-second sleep if the blocking call is actually being interrupted
+        assertTrue("expected the hang to be interrupted near the timeout, took ${elapsed}ms", elapsed < 1000)
+    }
+
+    @Test
     fun `imports past the deadline are skipped as timed out`() = runTest {
         val bundle = bundleOf("https://a.example/slow1.json", "https://a.example/slow2.json")
         // “concurrency = 1” forces two sequential batches; the first eats the whole
         // budget, so the deadline check before the second batch should skip it
-        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, concurrency = 1, timeBudgetMs = 50) {
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, concurrency = 1, deadline = System.currentTimeMillis() + 50) {
             Thread.sleep(150)
             memberJson
         }

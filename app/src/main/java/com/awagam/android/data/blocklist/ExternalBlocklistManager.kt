@@ -14,7 +14,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -47,6 +49,20 @@ class ExternalBlocklistManager(private val context: Context) {
         // periodic worker past its execution window
         private const val BUNDLE_FETCH_CONCURRENCY = 5
         private val BUNDLE_FETCH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(5)
+
+        // Ceiling for a single import fetch attempt (covering the whole
+        // `fetchWithFallbacks` chain, not just one HTTP call)—`fetchWithFallbacks`
+        // doesn’t share one timeout across its GitHub/jsDelivr/API methods the
+        // way Chromium’s `fetchFromGitHubWithFallbacks` does, so without this a
+        // single import could take minutes and stall a whole batch well past
+        // the deadline check between batches
+        private val BUNDLE_IMPORT_FETCH_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(30)
+
+        // Shared across every blocklist in one `refreshAllBlocklists()` pass—
+        // WorkManager gives a periodic worker roughly 10 minutes before the
+        // system stops it, so several bad bundles must share one budget
+        // instead of each getting a fresh BUNDLE_FETCH_TIME_BUDGET_MS
+        private val TOTAL_REFRESH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(8)
 
         internal fun convertToRawUrl(url: String): String {
             val hostLower = try { java.net.URI(url).host?.lowercase() } catch (e: Exception) { null } ?: return url
@@ -138,7 +154,8 @@ class ExternalBlocklistManager(private val context: Context) {
             bundleElement: JsonElement,
             bundleSize: Int,
             concurrency: Int = BUNDLE_FETCH_CONCURRENCY,
-            timeBudgetMs: Long = BUNDLE_FETCH_TIME_BUDGET_MS,
+            deadline: Long = System.currentTimeMillis() + BUNDLE_FETCH_TIME_BUDGET_MS,
+            importFetchTimeoutMs: Long = BUNDLE_IMPORT_FETCH_TIMEOUT_MS,
             fetchImport: (String) -> String
         ): ResolvedBundle {
             // Only structural problems are fatal—per-URL problems are skipped below
@@ -165,7 +182,6 @@ class ExternalBlocklistManager(private val context: Context) {
             // up; the overall deadline bounds the worst case regardless, by skipping
             // any batch that hasn’t started once the budget runs out
             val toFetch = entries.filter { it.fetchUrl != null }
-            val deadline = System.currentTimeMillis() + timeBudgetMs
             coroutineScope {
                 for (batch in toFetch.chunked(concurrency)) {
                     if (System.currentTimeMillis() >= deadline) {
@@ -175,18 +191,28 @@ class ExternalBlocklistManager(private val context: Context) {
                     batch.map { entry ->
                         val fetchUrl = entry.fetchUrl!!
                         async(Dispatchers.IO) {
-                            try {
-                                // One retry for transient failures—matching the resilience
-                                // of a single-blocklist refresh without compounding worst-case
-                                // time the way repeated retries of the whole fallback chain would
-                                entry.body = try {
-                                    fetchImport(fetchUrl)
+                            // One retry for transient failures; each attempt is capped at
+                            // `BUNDLE_IMPORT_FETCH_TIMEOUT_MS` so a single slow import can’t
+                            // hold up the whole batch. `fetchImport` is a plain blocking call
+                            // with no suspension points, so `withTimeoutOrNull` alone can’t cut
+                            // it off—cancellation is cooperative and only checked at suspension
+                            // points. `runInterruptible` bridges that: on timeout it interrupts
+                            // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor
+                            var body: String? = null
+                            var error: String? = null
+                            for (attempt in 1..2) {
+                                try {
+                                    body = withTimeoutOrNull(importFetchTimeoutMs) {
+                                        runInterruptible { fetchImport(fetchUrl) }
+                                    }
+                                    error = if (body == null) "timed out" else null
                                 } catch (e: Exception) {
-                                    fetchImport(fetchUrl)
+                                    error = e.message ?: e.javaClass.simpleName
                                 }
-                            } catch (e: Exception) {
-                                entry.failure = "${entry.importUrl} (${e.message ?: e.javaClass.simpleName})"
+                                if (body != null) break
                             }
+                            entry.body = body
+                            if (body == null) entry.failure = "${entry.importUrl} ($error)"
                         }
                     }.awaitAll()
                 }
@@ -377,7 +403,10 @@ class ExternalBlocklistManager(private val context: Context) {
      * Fetch and cache a blocklist from its URL.
      * Includes security validations: size limits, JSON depth, format validation.
      */
-    suspend fun refreshBlocklist(id: String) = withContext(Dispatchers.IO) {
+    suspend fun refreshBlocklist(
+        id: String,
+        deadline: Long = System.currentTimeMillis() + BUNDLE_FETCH_TIME_BUDGET_MS
+    ) = withContext(Dispatchers.IO) {
         val configs = getConfigsSnapshot()
         val config = configs.find { it.id == id } ?: return@withContext
         val nowIso = getIsoTimestamp()
@@ -414,7 +443,7 @@ class ExternalBlocklistManager(private val context: Context) {
             if (BlocklistValidator.isBundle(jsonElement)) {
                 // Bundles reference other blocklists instead of containing rules
                 // `resolveBundle` passes already-normalized import URLs
-                val resolved = resolveBundle(jsonElement, BlocklistValidator.utf8Size(body)) { importUrl ->
+                val resolved = resolveBundle(jsonElement, BlocklistValidator.utf8Size(body), deadline = deadline) { importUrl ->
                     fetchWithFallbacks(importUrl, importUrl)
                 }
                 bodyToCache = json.encodeToString(resolved.groups)
@@ -607,9 +636,17 @@ class ExternalBlocklistManager(private val context: Context) {
      * Refresh all enabled blocklists.
      */
     suspend fun refreshAllBlocklists() {
-        val configs = getConfigsSnapshot()
-        configs.filter { it.enabled }.forEach { config ->
-            refreshBlocklist(config.id)
+        val configs = getConfigsSnapshot().filter { it.enabled }
+        // Shared across every config in this pass, so several bad bundles can’t
+        // each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively run
+        // the periodic worker past its execution window
+        val deadline = System.currentTimeMillis() + TOTAL_REFRESH_TIME_BUDGET_MS
+        for (config in configs) {
+            if (System.currentTimeMillis() >= deadline) {
+                Log.w(TAG, "Stopping blocklist refresh early: time budget exhausted")
+                break
+            }
+            refreshBlocklist(config.id, deadline)
         }
     }
 
