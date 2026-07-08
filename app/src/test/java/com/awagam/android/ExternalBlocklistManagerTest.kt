@@ -49,6 +49,27 @@ class ExternalBlocklistManagerTest {
         }
     }
 
+    @Test
+    fun `GitHub file URL with a tree segment in its file path is converted, not rejected`() {
+        val input = "https://github.com/user/repo/blob/main/tree/list.json"
+        val expected = "https://raw.githubusercontent.com/user/repo/main/tree/list.json"
+        assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
+    }
+
+    @Test
+    fun `GitHub URL with tree outside the kind segment is unchanged`() {
+        // A release asset whose tag is named “tree” is neither a file page nor a directory
+        val url = "https://github.com/user/repo/releases/download/tree/list.json"
+        assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
+    }
+
+    @Test
+    fun `GitHub file URL with a second blob segment in its file path keeps that segment`() {
+        val input = "https://github.com/user/repo/blob/main/blob/list.json"
+        val expected = "https://raw.githubusercontent.com/user/repo/main/blob/list.json"
+        assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
+    }
+
     // GitLab
 
     @Test
