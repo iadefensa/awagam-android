@@ -306,6 +306,22 @@ class BlocklistValidatorTest {
     // Blocklist Format Validation Tests
 
     @Test
+    fun `a blocklist whose only group is named imports validates as a blocklist`() {
+        // The bundle format is disambiguated by type—“imports” as a group
+        // (an object) must keep working as a plain blocklist
+        val groups = mapOf(
+            "imports" to BlocklistGroup(
+                name = "Import trackers",
+                domains = listOf("tracker.example.com")
+            )
+        )
+
+        val result = BlocklistValidator.validateBlocklistFormat(groups)
+        assertTrue(result.valid)
+        assertEquals(1, result.metadata?.domains)
+    }
+
+    @Test
     fun `valid blocklist format passes`() {
         val groups = mapOf(
             "test" to BlocklistGroup(

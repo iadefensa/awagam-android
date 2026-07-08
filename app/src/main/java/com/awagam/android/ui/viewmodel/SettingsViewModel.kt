@@ -133,11 +133,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isRefreshing = true, error = null, successMessage = null) }
             try {
                 blocklistManager.refreshBlocklist(id)
-                // Check if there was an error by looking at the updated config
+                // Check if there was an error by looking at the updated config—
+                // “warning” also carries an `errorMessage` (a bundle’s skipped
+                // imports, shown on the card), but that refresh succeeded
                 val configs = blocklistManager.blocklistsFlow.first()
                 val config = configs.find { it.id == id }
-                if (config?.errorMessage != null) {
+                if (config?.status == "error") {
                     _uiState.update { it.copy(isRefreshing = false, error = "Failed: ${config.errorMessage}") }
+                } else if (config?.status == "warning") {
+                    _uiState.update { it.copy(isRefreshing = false, successMessage = "Blocklist refreshed—some imports were skipped") }
                 } else {
                     _uiState.update { it.copy(isRefreshing = false, successMessage = "Blocklist refreshed") }
                 }
@@ -152,9 +156,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isRefreshing = true, error = null, successMessage = null) }
             try {
                 blocklistManager.refreshAllBlocklists()
-                // Check for errors
+                // Check for errors—“warning” status is a successful refresh
                 val configs = blocklistManager.blocklistsFlow.first()
-                val errors = configs.filter { it.enabled && it.errorMessage != null }
+                val errors = configs.filter { it.enabled && it.status == "error" }
                 if (errors.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
