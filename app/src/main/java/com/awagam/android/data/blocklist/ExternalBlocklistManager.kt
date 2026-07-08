@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -38,6 +41,12 @@ class ExternalBlocklistManager(private val context: Context) {
         private val BLOCKLIST_CONFIGS = stringPreferencesKey("blocklist_configs")
         private val BLOCKLIST_CACHE_PREFIX = "blocklist_cache_"
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
+
+        // Bundle imports are fetched concurrently in batches within an overall
+        // deadline, so a bundle with many slow or dead imports can't stall the
+        // periodic worker past its execution window
+        private const val BUNDLE_FETCH_CONCURRENCY = 5
+        private val BUNDLE_FETCH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(5)
 
         internal fun convertToRawUrl(url: String): String {
             val hostLower = try { java.net.URI(url).host?.lowercase() } catch (e: Exception) { null } ?: return url
@@ -112,6 +121,11 @@ class ExternalBlocklistManager(private val context: Context) {
             val warning: String? = null
         )
 
+        private class BundleImportEntry(val importUrl: String, val fetchUrl: String? = null) {
+            var body: String? = null
+            var failure: String? = null
+        }
+
         /**
          * Resolve a bundle by fetching and merging all imported blocklists.
          * Imports that are invalid, duplicates, or fail to load or validate
@@ -120,7 +134,7 @@ class ExternalBlocklistManager(private val context: Context) {
          * Fetching is injected so the resolution logic can be tested without
          * a network.
          */
-        internal fun resolveBundle(
+        internal suspend fun resolveBundle(
             bundleElement: JsonElement,
             bundleSize: Int,
             fetchImport: (String) -> String
@@ -131,34 +145,68 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("Validation failed: ${structureValidation.error}")
             }
 
+            // Validate URLs and drop duplicates before fetching anything
+            val seenUrls = mutableSetOf<String>()
+            val entries = structureValidation.imports.map { importUrl ->
+                val urlValidation = BlocklistValidator.validateImportUrl(importUrl) { convertToRawUrl(it) }
+                when {
+                    !urlValidation.valid ->
+                        BundleImportEntry(importUrl).apply { failure = "$importUrl (${urlValidation.error})" }
+                    !seenUrls.add(urlValidation.normalizedUrl) ->
+                        BundleImportEntry(importUrl).apply { failure = "$importUrl (duplicate import)" }
+                    else -> BundleImportEntry(importUrl, fetchUrl = urlValidation.normalizedUrl)
+                }
+            }
+
+            // Fetch in small concurrent batches—fetching one import at a time could
+            // stall a large bundle for a very long time, since per-fetch timeouts add
+            // up; the overall deadline bounds the worst case regardless, by skipping
+            // any batch that hasn’t started once the budget runs out
+            val toFetch = entries.filter { it.fetchUrl != null }
+            val deadline = System.currentTimeMillis() + BUNDLE_FETCH_TIME_BUDGET_MS
+            coroutineScope {
+                for (batch in toFetch.chunked(BUNDLE_FETCH_CONCURRENCY)) {
+                    if (System.currentTimeMillis() >= deadline) {
+                        batch.forEach { it.failure = "${it.importUrl} (timed out)" }
+                        continue
+                    }
+                    batch.map { entry ->
+                        val fetchUrl = entry.fetchUrl!!
+                        async(Dispatchers.IO) {
+                            try {
+                                // One retry for transient failures—matching the resilience
+                                // of a single-blocklist refresh without compounding worst-case
+                                // time the way repeated retries of the whole fallback chain would
+                                entry.body = try {
+                                    fetchImport(fetchUrl)
+                                } catch (e: Exception) {
+                                    fetchImport(fetchUrl)
+                                }
+                            } catch (e: Exception) {
+                                entry.failure = "${entry.importUrl} (${e.message ?: e.javaClass.simpleName})"
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+
+            // Validate and merge in import order, so the group ID prefixes stay deterministic
             val merged = linkedMapOf<String, BlocklistGroup>()
             val failures = mutableListOf<String>()
-            val seenUrls = mutableSetOf<String>()
             var totalSize = bundleSize
             var importsLoaded = 0
 
-            structureValidation.imports.forEachIndexed { index, importUrl ->
-                val urlValidation = BlocklistValidator.validateImportUrl(importUrl) { convertToRawUrl(it) }
-                if (!urlValidation.valid) {
-                    failures.add("$importUrl (${urlValidation.error})")
+            entries.forEachIndexed { index, entry ->
+                if (entry.failure != null) {
+                    failures.add(entry.failure!!)
                     return@forEachIndexed
                 }
-                if (!seenUrls.add(urlValidation.normalizedUrl)) {
-                    failures.add("$importUrl (duplicate import)")
-                    return@forEachIndexed
-                }
-
-                val importBody = try {
-                    fetchImport(urlValidation.normalizedUrl)
-                } catch (e: Exception) {
-                    failures.add("$importUrl (${e.message ?: e.javaClass.simpleName})")
-                    return@forEachIndexed
-                }
+                val importBody = entry.body!!
 
                 // Reject oversized bodies before parsing them
                 val importSize = BlocklistValidator.utf8Size(importBody)
                 if (importSize > MAX_BLOCKLIST_SIZE) {
-                    failures.add("$importUrl (Blocklist too large. Maximum size is 10 MB.)")
+                    failures.add("${entry.importUrl} (blocklist too large (max 10 MB))")
                     return@forEachIndexed
                 }
 
@@ -178,7 +226,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     }
                     groups
                 } catch (e: Exception) {
-                    failures.add("$importUrl (${e.message ?: e.javaClass.simpleName})")
+                    failures.add("${entry.importUrl} (${e.message ?: e.javaClass.simpleName})")
                     null
                 }
 

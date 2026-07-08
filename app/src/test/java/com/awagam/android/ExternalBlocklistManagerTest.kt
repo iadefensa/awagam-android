@@ -2,6 +2,7 @@ package com.awagam.android
 
 import com.awagam.android.data.blocklist.BlocklistGroup
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -175,7 +176,7 @@ class ExternalBlocklistManagerTest {
     private val memberJson = """{"ads": {"name": "Ads", "domains": ["ads.example.com"]}}"""
 
     @Test
-    fun `failing imports are skipped with a warning`() {
+    fun `failing imports are skipped with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/dead.json", "https://a.example/ok2.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
             if (url.contains("dead")) throw Exception("HTTP 404") else memberJson
@@ -188,7 +189,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `invalid import URLs are skipped with a warning`() {
+    fun `invalid import URLs are skipped with a warning`() = runTest {
         val bundle = bundleOf("@@https://a.example/broken.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(2, resolved.metadata.imports)
@@ -197,7 +198,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `duplicate imports are skipped with a warning`() {
+    fun `duplicate imports are skipped with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(1, resolved.metadata.importsLoaded)
@@ -206,7 +207,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `oversized imports are skipped before parsing`() {
+    fun `oversized imports are skipped before parsing`() = runTest {
         val huge = "x".repeat(10 * 1024 * 1024 + 1)
         val bundle = bundleOf("https://a.example/huge.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
@@ -217,7 +218,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `imports are fetched via their normalized URL`() {
+    fun `imports are fetched via their normalized URL`() = runTest {
         val bundle = bundleOf("https://github.com/user/repo/blob/main/list.json")
         var fetchedUrl: String? = null
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
@@ -229,7 +230,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `skipped imports do not count toward the combined size limit`() {
+    fun `skipped imports do not count toward the combined size limit`() = runTest {
         // An invalid member almost as large as the limit—if its size counted, the valid import would push the bundle over
         val bigInvalid = "x".repeat(10 * 1024 * 1024 - 50)
         val bundle = bundleOf("https://a.example/big-bad.json", "https://a.example/ok.json")
@@ -241,7 +242,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `resolution fails when no import can be loaded`() {
+    fun `resolution fails when no import can be loaded`() = runTest {
         val bundle = bundleOf("https://a.example/d1.json", "https://a.example/d2.json")
         try {
             ExternalBlocklistManager.resolveBundle(bundle, 100) { throw Exception("HTTP 404") }
@@ -252,7 +253,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `nested bundles are skipped with a warning`() {
+    fun `nested bundles are skipped with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/nested.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
             if (url.contains("nested")) """{"imports": ["https://x.example/y.json"]}""" else memberJson
@@ -262,7 +263,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `invalid member JSON is skipped with a warning`() {
+    fun `invalid member JSON is skipped with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/bad.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
             if (url.contains("bad")) "{invalid" else memberJson
@@ -272,7 +273,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `healthy bundles resolve without warning`() {
+    fun `healthy bundles resolve without warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/ok2.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(null, resolved.warning)
@@ -281,7 +282,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `resolution fails when the combined size limit is exceeded`() {
+    fun `resolution fails when the combined size limit is exceeded`() = runTest {
         val bundle = bundleOf("https://a.example/ok.json")
         try {
             ExternalBlocklistManager.resolveBundle(bundle, 10 * 1024 * 1024 - 10) { memberJson }
@@ -292,7 +293,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `bundle size is counted in UTF-8 bytes`() {
+    fun `bundle size is counted in UTF-8 bytes`() = runTest {
         // “Ä” is one UTF-16 unit but two UTF-8 bytes—a character-based count would pass this bundle
         val member = """{"ads": {"name": "Äds", "domains": ["ads.example.com"]}}"""
         val bundle = bundleOf("https://a.example/ok.json")
