@@ -204,13 +204,13 @@ object BlocklistValidator {
         val normalizedUrl = try {
             normalizeUrl(url)
         } catch (e: Exception) {
-            return ImportUrlValidationResult(false, e.message ?: "Invalid import URL")
+            return ImportUrlValidationResult(false, e.message ?: "invalid import URL")
         }
         if (url.length > MAX_URL_LENGTH || normalizedUrl.length > MAX_URL_LENGTH) {
-            return ImportUrlValidationResult(false, "Import URL too long (max $MAX_URL_LENGTH characters)")
+            return ImportUrlValidationResult(false, "import URL too long (max $MAX_URL_LENGTH characters)")
         }
         if (!isValidBlocklistUrl(url) || !isValidBlocklistUrl(normalizedUrl)) {
-            return ImportUrlValidationResult(false, "Invalid or insecure import URL")
+            return ImportUrlValidationResult(false, "invalid or insecure import URL")
         }
         return ImportUrlValidationResult(true, normalizedUrl = normalizedUrl)
     }
