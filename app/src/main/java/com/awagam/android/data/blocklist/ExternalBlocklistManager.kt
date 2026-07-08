@@ -114,37 +114,45 @@ class ExternalBlocklistManager(private val context: Context) {
 
         /**
          * Resolve a bundle by fetching and merging all imported blocklists.
-         * Imports that fail to load or validate are skipped with a warning; the
-         * refresh fails only if no import can be loaded, or if the merged result
-         * exceeds the blocklist limits. Fetching is injected so the resolution
-         * logic can be tested without a network.
+         * Imports that are invalid, duplicates, or fail to load or validate
+         * are skipped with a warning; the refresh fails only if no import can
+         * be loaded, or if the merged result exceeds the blocklist limits.
+         * Fetching is injected so the resolution logic can be tested without
+         * a network.
          */
         internal fun resolveBundle(
             bundleElement: JsonElement,
             bundleSize: Int,
             fetchImport: (String) -> String
         ): ResolvedBundle {
-            val bundleValidation = BlocklistValidator.validateBundleFormat(bundleElement) { convertToRawUrl(it) }
-            if (!bundleValidation.valid) {
-                throw Exception("Validation failed: ${bundleValidation.error}")
+            // Only structural problems are fatal—per-URL problems are skipped below
+            val structureValidation = BlocklistValidator.validateBundleStructure(bundleElement)
+            if (!structureValidation.valid) {
+                throw Exception("Validation failed: ${structureValidation.error}")
             }
 
             val merged = linkedMapOf<String, BlocklistGroup>()
             val failures = mutableListOf<String>()
+            val seenUrls = mutableSetOf<String>()
             var totalSize = bundleSize
             var importsLoaded = 0
 
-            bundleValidation.imports.forEachIndexed { index, importUrl ->
+            structureValidation.imports.forEachIndexed { index, importUrl ->
+                val urlValidation = BlocklistValidator.validateImportUrl(importUrl) { convertToRawUrl(it) }
+                if (!urlValidation.valid) {
+                    failures.add("$importUrl (${urlValidation.error})")
+                    return@forEachIndexed
+                }
+                if (!seenUrls.add(urlValidation.normalizedUrl)) {
+                    failures.add("$importUrl (duplicate import)")
+                    return@forEachIndexed
+                }
+
                 val importBody = try {
                     fetchImport(importUrl)
                 } catch (e: Exception) {
                     failures.add("$importUrl (${e.message})")
                     return@forEachIndexed
-                }
-
-                totalSize += BlocklistValidator.utf8Size(importBody)
-                if (totalSize > MAX_BLOCKLIST_SIZE) {
-                    throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
                 }
 
                 // Validate the member; failures skip it, they don’t fail the bundle
@@ -168,6 +176,12 @@ class ExternalBlocklistManager(private val context: Context) {
                 }
 
                 if (importGroups != null) {
+                    // Only imports that contribute rules count toward the combined size
+                    // limit—a skipped import must not be able to fail the bundle
+                    totalSize += BlocklistValidator.utf8Size(importBody)
+                    if (totalSize > MAX_BLOCKLIST_SIZE) {
+                        throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
+                    }
                     // Group-limit failures inside the merge stay fatal
                     mergeImportedGroups(merged, importGroups, index)
                     importsLoaded++
@@ -185,11 +199,11 @@ class ExternalBlocklistManager(private val context: Context) {
             }
 
             val metadata = (mergedValidation.metadata ?: BlocklistMetadata()).copy(
-                imports = bundleValidation.imports.size,
+                imports = structureValidation.imports.size,
                 importsLoaded = importsLoaded
             )
             val warning = if (failures.isNotEmpty()) {
-                "${failures.size} of ${bundleValidation.imports.size} imported blocklists could not be loaded: ${failures.joinToString("; ")}"
+                "${failures.size} of ${structureValidation.imports.size} imports skipped: ${failures.joinToString("; ")}"
             } else {
                 null
             }

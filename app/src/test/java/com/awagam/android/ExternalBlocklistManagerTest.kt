@@ -183,8 +183,38 @@ class ExternalBlocklistManagerTest {
         assertEquals(3, resolved.metadata.imports)
         assertEquals(2, resolved.metadata.importsLoaded)
         assertEquals(setOf("import1_ads", "import3_ads"), resolved.groups.keys.toSet())
-        assertTrue(resolved.warning!!.startsWith("1 of 3 imported blocklists could not be loaded"))
+        assertTrue(resolved.warning!!.startsWith("1 of 3 imports skipped"))
         assertTrue(resolved.warning!!.contains("dead.json"))
+    }
+
+    @Test
+    fun `invalid import URLs are skipped with a warning`() {
+        val bundle = bundleOf("@@https://a.example/broken.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
+        assertEquals(2, resolved.metadata.imports)
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("@@https://a.example/broken.json"))
+    }
+
+    @Test
+    fun `duplicate imports are skipped with a warning`() {
+        val bundle = bundleOf("https://a.example/ok.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertEquals(setOf("import1_ads"), resolved.groups.keys.toSet())
+        assertTrue(resolved.warning!!.contains("duplicate import"))
+    }
+
+    @Test
+    fun `skipped imports do not count toward the combined size limit`() {
+        // An invalid member almost as large as the limit—if its size counted, the valid import would push the bundle over
+        val bigInvalid = "x".repeat(10 * 1024 * 1024 - 50)
+        val bundle = bundleOf("https://a.example/big-bad.json", "https://a.example/ok.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+            if (url.contains("big-bad")) bigInvalid else memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("big-bad.json"))
     }
 
     @Test

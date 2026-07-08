@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
+import com.awagam.android.ui.theme.Warning
 import com.awagam.android.ui.viewmodel.SettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -434,7 +435,8 @@ private fun BlocklistCard(
                 Text(
                     text = blocklist.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    // “warning” means active with skipped bundle imports—not an error
+                    color = if (blocklist.status == "warning") Warning else MaterialTheme.colorScheme.error,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
