@@ -177,9 +177,27 @@ class ExternalBlocklistManagerTest {
     private val memberJson = """{"ads": {"name": "Ads", "domains": ["ads.example.com"]}}"""
 
     @Test
+    fun `failed attempts back off exponentially before retrying`() = runTest {
+        val bundle = bundleOf("https://a.example/flaky.json")
+        var calls = 0
+        val start = System.currentTimeMillis()
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 20) {
+            calls++
+            if (calls < 3) throw Exception("HTTP 503") else memberJson
+        }
+        val elapsed = System.currentTimeMillis() - start
+        // Recovers on the 3rd attempt—proves retries aren’t just counted, they happen
+        assertEquals(3, calls)
+        assertEquals(1, resolved.metadata.importsLoaded)
+        // Backoff before attempt 2 is 2 * 20 = 40 ms, before attempt 3 is 4 * 20 = 80 ms—
+        // at least 120 ms of real delay if the backoff is actually being awaited
+        assertTrue("expected real backoff delays (>=110ms), took ${elapsed}ms", elapsed >= 110)
+    }
+
+    @Test
     fun `failing imports are skipped with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/dead.json", "https://a.example/ok2.json")
-        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { url ->
             if (url.contains("dead")) throw Exception("HTTP 404") else memberJson
         }
         assertEquals(3, resolved.metadata.imports)
@@ -246,7 +264,7 @@ class ExternalBlocklistManagerTest {
     fun `resolution fails when no import can be loaded`() = runTest {
         val bundle = bundleOf("https://a.example/d1.json", "https://a.example/d2.json")
         try {
-            ExternalBlocklistManager.resolveBundle(bundle, 100) { throw Exception("HTTP 404") }
+            ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { throw Exception("HTTP 404") }
             fail("Expected resolution to fail")
         } catch (e: Exception) {
             assertTrue(e.message!!.contains("None of the imported blocklists could be loaded"))
@@ -319,7 +337,7 @@ class ExternalBlocklistManagerTest {
         val bundle = bundleOf("https://a.example/hang.json", "https://a.example/ok.json")
         val start = System.currentTimeMillis()
         val resolved = ExternalBlocklistManager.resolveBundle(
-            bundle, 100, concurrency = 2, importFetchTimeoutMs = 50
+            bundle, 100, concurrency = 2, importFetchTimeoutMs = 50, retryBackoffUnit = 1
         ) { url ->
             if (url.contains("hang")) {
                 Thread.sleep(2000) // would dominate the test unless actually interrupted
@@ -329,8 +347,9 @@ class ExternalBlocklistManagerTest {
         val elapsed = System.currentTimeMillis() - start
         assertEquals(1, resolved.metadata.importsLoaded)
         assertTrue(resolved.warning!!.contains("timed out"))
-        // Two attempts at ~50ms each (with the one retry) should finish in well under
-        // the 2-second sleep if the blocking call is actually being interrupted
+        // Three attempts at ~50 ms each (plus a negligible 1ms-unit backoff) should
+        // finish in well under the 2-second sleep if the blocking call is actually
+        // being interrupted
         assertTrue("expected the hang to be interrupted near the timeout, took ${elapsed}ms", elapsed < 1000)
     }
 
@@ -343,7 +362,7 @@ class ExternalBlocklistManagerTest {
         val bundle = bundleOf("https://a.example/ok.json", "https://a.example/slow.json", "https://a.example/never.json")
         val resolved = ExternalBlocklistManager.resolveBundle(
             bundle, 100, concurrency = 1, deadline = System.currentTimeMillis() + 80,
-            importFetchTimeoutMs = 50
+            importFetchTimeoutMs = 50, retryBackoffUnit = 1
         ) { url ->
             if (url.contains("slow")) Thread.sleep(200)
             memberJson

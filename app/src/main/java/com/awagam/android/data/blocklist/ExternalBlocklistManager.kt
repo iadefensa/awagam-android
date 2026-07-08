@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -53,10 +54,14 @@ class ExternalBlocklistManager(private val context: Context) {
         // Ceiling for a single import fetch attempt (covering the whole
         // `fetchWithFallbacks` chain, not just one HTTP call)—`fetchWithFallbacks`
         // doesn’t share one timeout across its GitHub/jsDelivr/API methods the
-        // way Chromium’s `fetchFromGitHubWithFallbacks` does, so without this a
-        // single import could take minutes and stall a whole batch well past
-        // the deadline check between batches
+        // way AWAGAM Chromium’s `fetchFromGitHubWithFallbacks` does, so without
+        // this a single import could take minutes and stall a whole batch well
+        // past the deadline check between batches
         private val BUNDLE_IMPORT_FETCH_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(30)
+
+        // Matches AWAGAM Chromium’s `fetchBlocklistData` retry count and
+        // exponential backoff (2^attempt seconds)
+        private const val BUNDLE_IMPORT_MAX_ATTEMPTS = 3
 
         // Shared across every blocklist in one `refreshAllBlocklists()` pass—
         // WorkManager gives a periodic worker roughly 10 minutes before the
@@ -156,6 +161,7 @@ class ExternalBlocklistManager(private val context: Context) {
             concurrency: Int = BUNDLE_FETCH_CONCURRENCY,
             deadline: Long = System.currentTimeMillis() + BUNDLE_FETCH_TIME_BUDGET_MS,
             importFetchTimeoutMs: Long = BUNDLE_IMPORT_FETCH_TIMEOUT_MS,
+            retryBackoffUnit: Long = TimeUnit.SECONDS.toMillis(1),
             fetchImport: (String) -> String
         ): ResolvedBundle {
             // Only structural problems are fatal—per-URL problems are skipped below
@@ -193,7 +199,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     batch.map { entry ->
                         val fetchUrl = entry.fetchUrl!!
                         async(Dispatchers.IO) {
-                            // One retry for transient failures; each attempt is capped at
+                            // Retries for transient failures; each attempt is capped at
                             // `BUNDLE_IMPORT_FETCH_TIMEOUT_MS` so a single slow import can’t
                             // hold up the whole batch. `fetchImport` is a plain blocking call
                             // with no suspension points, so `withTimeoutOrNull` alone can’t cut
@@ -202,7 +208,7 @@ class ExternalBlocklistManager(private val context: Context) {
                             // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor
                             var body: String? = null
                             var error: String? = null
-                            for (attempt in 1..2) {
+                            for (attempt in 1..BUNDLE_IMPORT_MAX_ATTEMPTS) {
                                 try {
                                     body = withTimeoutOrNull(importFetchTimeoutMs) {
                                         runInterruptible { fetchImport(fetchUrl) }
@@ -212,6 +218,11 @@ class ExternalBlocklistManager(private val context: Context) {
                                     error = e.message ?: e.javaClass.simpleName
                                 }
                                 if (body != null) break
+                                if (attempt < BUNDLE_IMPORT_MAX_ATTEMPTS) {
+                                    // Exponential backoff before retrying—be a respectful
+                                    // client to third-party servers, not a rapid-fire one
+                                    delay((1L shl attempt) * retryBackoffUnit)
+                                }
                             }
                             entry.body = body
                             if (body == null) entry.failure = "${entry.importUrl} ($error)"
