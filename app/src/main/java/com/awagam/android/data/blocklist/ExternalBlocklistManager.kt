@@ -185,7 +185,9 @@ class ExternalBlocklistManager(private val context: Context) {
             coroutineScope {
                 for (batch in toFetch.chunked(concurrency)) {
                     if (System.currentTimeMillis() >= deadline) {
-                        batch.forEach { it.failure = "${it.importUrl} (timed out)" }
+                        // Distinct from the per-attempt “timed out” below—this import was
+                        // never even started, not slow to respond
+                        batch.forEach { it.failure = "${it.importUrl} (time budget exceeded)" }
                         continue
                     }
                     batch.map { entry ->

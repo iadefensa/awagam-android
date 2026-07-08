@@ -335,7 +335,27 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `imports past the deadline are skipped as timed out`() = runTest {
+    fun `a slow fetch and a never-attempted import report distinct reasons`() = runTest {
+        // “concurrency = 1” forces sequential batches: ok.json succeeds fast, slow.json
+        // is slow enough to hit its own fetch timeout, and that alone exceeds the
+        // overall deadline, so never.json is never attempted at all—these are two
+        // different failures and should read differently, not both as generic “timed out”
+        val bundle = bundleOf("https://a.example/ok.json", "https://a.example/slow.json", "https://a.example/never.json")
+        val resolved = ExternalBlocklistManager.resolveBundle(
+            bundle, 100, concurrency = 1, deadline = System.currentTimeMillis() + 80,
+            importFetchTimeoutMs = 50
+        ) { url ->
+            if (url.contains("slow")) Thread.sleep(200)
+            memberJson
+        }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        val failures = resolved.warning!!
+        assertTrue("expected slow.json to report a fetch timeout: $failures", failures.contains("slow.json (timed out)"))
+        assertTrue("expected never.json to report the budget, not a fetch timeout: $failures", failures.contains("never.json (time budget exceeded)"))
+    }
+
+    @Test
+    fun `imports past the deadline are skipped as time budget exceeded`() = runTest {
         val bundle = bundleOf("https://a.example/slow1.json", "https://a.example/slow2.json")
         // “concurrency = 1” forces two sequential batches; the first eats the whole
         // budget, so the deadline check before the second batch should skip it
@@ -344,7 +364,7 @@ class ExternalBlocklistManagerTest {
             memberJson
         }
         assertEquals(1, resolved.metadata.importsLoaded)
-        assertTrue(resolved.warning!!.contains("timed out"))
+        assertTrue(resolved.warning!!.contains("time budget exceeded"))
     }
 
     @Test
