@@ -78,6 +78,13 @@ class ExternalBlocklistManager(private val context: Context) {
                     .replace("/blob/", "/")
             }
 
+            // GitHub tree URLs point to directories, not files—rejecting them here
+            // gives a clearer message than the fetch failure they’d produce later
+            // (matches AWAGAM Chromium’s `convertToRawUrl`)
+            if (hostLower == "github.com" && url.contains("/tree/")) {
+                throw Exception("Directory URLs are not supported. Please link to a specific file.")
+            }
+
             if (hostLower == "gitlab.com" && url.contains("/-/blob/")) {
                 return url.replace("/-/blob/", "/-/raw/")
             }
@@ -649,11 +656,23 @@ class ExternalBlocklistManager(private val context: Context) {
      * Refresh all enabled blocklists.
      */
     suspend fun refreshAllBlocklists() {
-        val configs = getConfigsSnapshot().filter { it.enabled }
-        // Shared across every config in this pass, so several bad bundles can’t
-        // each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively run
-        // the periodic worker past its execution window
+        refreshBlocklists { true }
+    }
+
+    /**
+     * Refresh the enabled blocklists matching (`shouldRefresh`), least recently
+     * attempted first, within one shared time budget—so several bad bundles
+     * can’t each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively
+     * run the periodic worker past its execution window, and a chronically
+     * slow or failing blocklist can’t claim the budget every pass and starve
+     * the configs after it.
+     */
+    private suspend fun refreshBlocklists(shouldRefresh: (ExternalBlocklistConfig) -> Boolean) {
         val deadline = System.currentTimeMillis() + TOTAL_REFRESH_TIME_BUDGET_MS
+        val configs = getConfigsSnapshot()
+            .filter { it.enabled && shouldRefresh(it) }
+            // ISO timestamps sort lexicographically; never-attempted configs go first
+            .sortedBy { it.lastAttempted ?: "" }
         for (config in configs) {
             if (System.currentTimeMillis() >= deadline) {
                 Log.w(TAG, "Stopping blocklist refresh early: time budget exhausted")
@@ -722,10 +741,6 @@ class ExternalBlocklistManager(private val context: Context) {
      * Refresh blocklists that need updating based on their update interval.
      */
     suspend fun refreshBlocklistsIfNeeded() {
-        val configs = getConfigsSnapshot()
-        configs.filter { it.enabled && needsUpdate(it) }.forEach { config ->
-            Log.d(TAG, "Blocklist ${config.name} needs update, refreshing...")
-            refreshBlocklist(config.id)
-        }
+        refreshBlocklists { needsUpdate(it) }
     }
 }

@@ -39,6 +39,16 @@ class ExternalBlocklistManagerTest {
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
 
+    @Test
+    fun `GitHub tree URL is rejected as a directory`() {
+        try {
+            ExternalBlocklistManager.convertToRawUrl("https://github.com/user/repo/tree/main/lists")
+            fail("Expected directory URL to be rejected")
+        } catch (err: Exception) {
+            assertTrue(err.message!!.contains("Directory URLs are not supported"))
+        }
+    }
+
     // GitLab
 
     @Test
