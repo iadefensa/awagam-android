@@ -17,7 +17,10 @@ object BlocklistValidator {
     // Limits matching browser extension
     private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
     private const val MAX_JSON_DEPTH = 20
-    private const val MAX_GROUPS = 100
+    const val MAX_GROUPS = 100
+    // Matches the 100-group blocklist limit, since more (non-empty) imports
+    // could never validate after merging anyway
+    private const val MAX_BUNDLE_IMPORTS = 100
     private const val MAX_NAME_LENGTH = 200
     private const val MAX_URL_LENGTH = 2000
     private const val MAX_ERROR_LENGTH = 500
@@ -82,7 +85,14 @@ object BlocklistValidator {
      * Validate blocklist size.
      */
     fun validateSize(content: String): Boolean {
-        return content.length <= MAX_BLOCKLIST_SIZE
+        return utf8Size(content) <= MAX_BLOCKLIST_SIZE
+    }
+
+    /**
+     * UTF-8 byte size of a string—the size limit is a byte limit, not a character count.
+     */
+    fun utf8Size(content: String): Int {
+        return content.toByteArray(Charsets.UTF_8).size
     }
 
     /**
@@ -119,6 +129,120 @@ object BlocklistValidator {
      */
     fun validateJsonDepth(element: JsonElement): Boolean {
         return getJsonDepth(element) <= MAX_JSON_DEPTH
+    }
+
+    /**
+     * Bundle validation result with the list of import URLs on success.
+     */
+    data class BundleValidationResult(
+        val valid: Boolean,
+        val error: String? = null,
+        val imports: List<String> = emptyList()
+    )
+
+    /**
+     * Detect the AWAGAM bundle format (an object whose “imports” field is an array).
+     * Matches browser extension detection logic.
+     */
+    fun isBundle(element: JsonElement): Boolean {
+        return element is JsonObject && element["imports"] is JsonArray
+    }
+
+    /**
+     * Validate the bundle envelope—only problems that make the file unusable
+     * as a whole are reported here; per-URL problems are handled by the
+     * callers (fatal via `validateBundleFormat`, skippable at runtime).
+     * Returns the import URLs on success.
+     */
+    fun validateBundleStructure(element: JsonElement): BundleValidationResult {
+        if (!isBundle(element)) {
+            return BundleValidationResult(false, "A bundle must be an object with an \"imports\" array")
+        }
+
+        val obj = element as JsonObject
+        val extraKeys = obj.keys.filter { it != "imports" }
+        if (extraKeys.isNotEmpty()) {
+            return BundleValidationResult(false, "A bundle must contain only the \"imports\" field (found: ${extraKeys.joinToString(", ")})")
+        }
+
+        val importsArray = obj["imports"] as JsonArray
+        if (importsArray.isEmpty()) {
+            return BundleValidationResult(false, "\"imports\" must contain at least one URL")
+        }
+        if (importsArray.size > MAX_BUNDLE_IMPORTS) {
+            return BundleValidationResult(false, "Too many imports (max $MAX_BUNDLE_IMPORTS)")
+        }
+
+        val urls = mutableListOf<String>()
+        for (item in importsArray) {
+            val url = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: return BundleValidationResult(false, "\"imports\" contains a non-string entry")
+            urls.add(url)
+        }
+
+        return BundleValidationResult(true, imports = urls)
+    }
+
+    /**
+     * Import URL validation result with the normalized URL on success.
+     */
+    data class ImportUrlValidationResult(
+        val valid: Boolean,
+        val error: String? = null,
+        val normalizedUrl: String = ""
+    )
+
+    /**
+     * Validate a single import URL, returning its normalized form for
+     * fetching and duplicate detection. The original URL is validated too—a
+     * normalizer must not be able to turn an insecure URL into an acceptable one.
+     */
+    fun validateImportUrl(
+        url: String,
+        normalizeUrl: (String) -> String = { it }
+    ): ImportUrlValidationResult {
+        val normalizedUrl = try {
+            normalizeUrl(url)
+        } catch (e: Exception) {
+            return ImportUrlValidationResult(false, e.message ?: "invalid import URL")
+        }
+        if (url.length > MAX_URL_LENGTH || normalizedUrl.length > MAX_URL_LENGTH) {
+            return ImportUrlValidationResult(false, "import URL too long (max $MAX_URL_LENGTH characters)")
+        }
+        if (!isValidBlocklistUrl(url) || !isValidBlocklistUrl(normalizedUrl)) {
+            return ImportUrlValidationResult(false, "invalid or insecure import URL")
+        }
+        return ImportUrlValidationResult(true, normalizedUrl = normalizedUrl)
+    }
+
+    /**
+     * Validate AWAGAM bundle format (strict—any invalid or duplicate import
+     * fails; at runtime, bundle resolution skips such imports instead).
+     * A bundle contains only the “imports” field with 1–100 unique HTTPS URLs.
+     * Pass a normalizer so the same blocklist can’t be imported twice via
+     * different URL representations (e.g., GitHub blob vs. raw).
+     */
+    fun validateBundleFormat(
+        element: JsonElement,
+        normalizeUrl: (String) -> String = { it }
+    ): BundleValidationResult {
+        val structureValidation = validateBundleStructure(element)
+        if (!structureValidation.valid) {
+            return structureValidation
+        }
+
+        val seenUrls = mutableSetOf<String>()
+        for (url in structureValidation.imports) {
+            val urlValidation = validateImportUrl(url, normalizeUrl)
+            if (!urlValidation.valid) {
+                return BundleValidationResult(false, "$url (${urlValidation.error})")
+            }
+            if (!seenUrls.add(urlValidation.normalizedUrl)) {
+                return BundleValidationResult(false, "Duplicate import URL: $url")
+            }
+        }
+
+        return BundleValidationResult(true, imports = structureValidation.imports)
     }
 
     /**
@@ -292,12 +416,12 @@ object BlocklistValidator {
     }
 
     /**
-     * Sanitize a string by limiting length and stripping HTML.
+     * Sanitize a string by removing angle brackets (so it can’t carry HTML tags)
+     * and limiting length, with an ellipsis when truncated.
      */
     private fun sanitizeString(input: String, maxLength: Int): String {
-        return input
-            .take(maxLength)
-            .replace(Regex("[<>]"), "") // Strip HTML tags
+        val stripped = input.replace(Regex("[<>]"), "")
+        return if (stripped.length > maxLength) stripped.take(maxLength - 1) + "…" else stripped
     }
 
     /**

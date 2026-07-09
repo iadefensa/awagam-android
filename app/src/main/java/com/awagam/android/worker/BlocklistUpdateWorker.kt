@@ -75,8 +75,10 @@ class BlocklistUpdateWorker(
             val manager = ExternalBlocklistManager(applicationContext)
             manager.refreshAllBlocklists()
 
+            // Only actual failures—“warning” also carries an `errorMessage` (a
+            // bundle’s skipped imports), but that refresh succeeded
             val failedConfigs = manager.blocklistsFlow.first()
-                .filter { it.enabled && it.errorMessage != null }
+                .filter { it.enabled && it.status == "error" }
             if (failedConfigs.isNotEmpty()) {
                 notifyRefreshFailure(failedConfigs.size)
             }

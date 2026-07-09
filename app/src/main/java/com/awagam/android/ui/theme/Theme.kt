@@ -8,6 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+// Amber-400 (semantic: warning, matching the extension’s warning status)—
+// Material 3 color schemes have no warning slot (contrast with surface ≈ 8:1)
+val Warning = Color(0xFFFBBF24)
+
 // Shadcn-style neutral palette (matching extension design)
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFEBEBEB),            // Near-white (matching Basecoat primary)
