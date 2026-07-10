@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: "Check out repository"
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: "Set up Gradle"
         uses: gradle/actions/setup-gradle@v6
       - name: "Run unit tests"
