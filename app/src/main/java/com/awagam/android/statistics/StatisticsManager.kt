@@ -3,45 +3,80 @@
 package com.awagam.android.statistics
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 private val Context.statisticsDataStore: DataStore<Preferences> by preferencesDataStore(name = "statistics")
 
 /**
  * Statistics tracker for DNS queries, blocking, and performance metrics.
  * Provides real-time and historical data for the statistics dashboard.
+ *
+ * Recording happens on the DNS hot path, so counters are kept in memory as
+ * deltas and flushed to disk at most once per [FLUSH_INTERVAL_MS]; a device
+ * issues thousands of DNS queries per minute, and one file write per query
+ * would cost battery, flash wear, and query latency.
  */
 class StatisticsManager(private val context: Context) {
 
     companion object {
-        private val TOTAL_QUERIES = intPreferencesKey("total_queries")
-        private val BLOCKED_QUERIES = intPreferencesKey("blocked_queries")
-        private val CACHE_HITS = intPreferencesKey("cache_hits")
-        private val CACHE_MISSES = intPreferencesKey("cache_misses")
+        private const val TAG = "StatisticsManager"
+
+        private val TOTAL_QUERIES = longPreferencesKey("total_queries")
+        private val BLOCKED_QUERIES = longPreferencesKey("blocked_queries")
+        private val CACHE_HITS = longPreferencesKey("cache_hits")
+        private val CACHE_MISSES = longPreferencesKey("cache_misses")
         private val SESSION_START = longPreferencesKey("session_start")
         private val TOTAL_BYTES = longPreferencesKey("total_bytes")
+
+        private val FLUSH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30)
+
+        // How often a collecting screen re-reads the counters
+        private val DISPLAY_REFRESH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(1)
     }
 
-    private val mutex = Mutex()
+    private val flushMutex = Mutex()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Counts recorded since the last flush, added to the stored totals on flush
+    private val pendingQueries = AtomicLong(0)
+    private val pendingBlocked = AtomicLong(0)
+    private val pendingCacheHits = AtomicLong(0)
+    private val pendingCacheMisses = AtomicLong(0)
+    private val pendingBytes = AtomicLong(0)
 
     // In-memory counters for current session
-    private var sessionQueries = 0
-    private var sessionBlocked = 0
-    private var sessionCacheHits = 0
-    private var sessionCacheMisses = 0
-    private var sessionBytes = 0L
+    private val sessionQueries = AtomicLong(0)
+    private val sessionBlocked = AtomicLong(0)
+    private val sessionCacheHits = AtomicLong(0)
+    private val sessionCacheMisses = AtomicLong(0)
+    private val sessionBytes = AtomicLong(0)
+
+    // Non-null while a flush is scheduled; keeps recording from queuing one per query
+    @Volatile
+    private var flushJob: Job? = null
 
     private val refreshTrigger = MutableStateFlow(0L)
 
@@ -49,12 +84,12 @@ class StatisticsManager(private val context: Context) {
      * Statistics data model for UI display.
      */
     data class Statistics(
-        val totalQueries: Int,
-        val blockedQueries: Int,
-        val cacheHits: Int,
-        val cacheMisses: Int,
-        val sessionQueries: Int,
-        val sessionBlocked: Int,
+        val totalQueries: Long,
+        val blockedQueries: Long,
+        val cacheHits: Long,
+        val cacheMisses: Long,
+        val sessionQueries: Long,
+        val sessionBlocked: Long,
         val cacheHitRate: Double,
         val blockRate: Double,
         val sessionUptime: Long,
@@ -72,103 +107,220 @@ class StatisticsManager(private val context: Context) {
         val lastQueried: Long
     )
 
+    /**
+     * Paces UI updates. Recording no longer writes to disk on every query, so
+     * the DataStore alone would only re-emit once per flush and leave the
+     * displayed counters frozen in between. This is cold: it ticks only while a
+     * screen is collecting, and costs nothing when none is.
+     */
+    private val displayTicker: Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(DISPLAY_REFRESH_INTERVAL_MS)
+        }
+    }
+
     // Flow of current statistics
     val statisticsFlow: Flow<Statistics> = combine(
         context.statisticsDataStore.data,
-        refreshTrigger
-    ) { preferences, _ ->
-        val sessionUptime = if (preferences[SESSION_START] != null) {
-            System.currentTimeMillis() - preferences[SESSION_START]!!
+        refreshTrigger,
+        displayTicker
+    ) { preferences, _, _ ->
+        val storedSessionStart = preferences.counter(SESSION_START)
+        val sessionUptime = if (storedSessionStart > 0L) {
+            System.currentTimeMillis() - storedSessionStart
         } else 0L
 
-        val totalCacheHits = preferences[CACHE_HITS] ?: 0
-        val totalCacheMisses = preferences[CACHE_MISSES] ?: 0
+        // Add the not-yet-flushed deltas so the UI reflects the current state
+        val totalQueries = preferences.counter(TOTAL_QUERIES) + pendingQueries.get()
+        val totalBlocked = preferences.counter(BLOCKED_QUERIES) + pendingBlocked.get()
+        val totalCacheHits = preferences.counter(CACHE_HITS) + pendingCacheHits.get()
+        val totalCacheMisses = preferences.counter(CACHE_MISSES) + pendingCacheMisses.get()
+
         val cacheHitRate = if ((totalCacheHits + totalCacheMisses) > 0) {
             totalCacheHits.toDouble() / (totalCacheHits + totalCacheMisses)
         } else 0.0
 
-        val blockRate = if (sessionQueries > 0) {
-            sessionBlocked.toDouble() / sessionQueries
-        } else 0.0
+        val queries = sessionQueries.get()
+        val blocked = sessionBlocked.get()
+        val blockRate = if (queries > 0) blocked.toDouble() / queries else 0.0
 
         Statistics(
-            totalQueries = preferences[TOTAL_QUERIES] ?: 0,
-            blockedQueries = preferences[BLOCKED_QUERIES] ?: 0,
-            cacheHits = preferences[CACHE_HITS] ?: 0,
-            cacheMisses = preferences[CACHE_MISSES] ?: 0,
-            sessionQueries = sessionQueries,
-            sessionBlocked = sessionBlocked,
+            totalQueries = totalQueries,
+            blockedQueries = totalBlocked,
+            cacheHits = totalCacheHits,
+            cacheMisses = totalCacheMisses,
+            sessionQueries = queries,
+            sessionBlocked = blocked,
             cacheHitRate = cacheHitRate,
             blockRate = blockRate,
             sessionUptime = sessionUptime,
-            totalBytes = preferences[TOTAL_BYTES] ?: 0L
+            totalBytes = preferences.counter(TOTAL_BYTES) + pendingBytes.get()
         )
     }
 
     /**
+     * Read a counter, tolerating values written as `Int` by earlier versions.
+     * `Preferences.Key` compares by name, so the stored entry is found either
+     * way and is rewritten as a `Long` by the next flush.
+     */
+    private fun Preferences.counter(key: Preferences.Key<Long>): Long =
+        when (val value = asMap()[key]) {
+            is Long -> value
+            is Int -> value.toLong()
+            else -> 0L
+        }
+
+    /**
      * Record a DNS query.
      */
-    suspend fun recordQuery(domain: String, bytes: Int) = mutex.withLock {
-        sessionQueries++
-        sessionBytes += bytes
-
-        context.statisticsDataStore.edit { preferences ->
-            preferences[TOTAL_QUERIES] = (preferences[TOTAL_QUERIES] ?: 0) + 1
-            preferences[TOTAL_BYTES] = (preferences[TOTAL_BYTES] ?: 0L) + bytes
-            if (preferences[SESSION_START] == null) {
-                preferences[SESSION_START] = System.currentTimeMillis()
-            }
-        }
+    fun recordQuery(domain: String, bytes: Int) {
+        sessionQueries.incrementAndGet()
+        sessionBytes.addAndGet(bytes.toLong())
+        pendingQueries.incrementAndGet()
+        pendingBytes.addAndGet(bytes.toLong())
+        scheduleFlush()
     }
 
     /**
      * Record a blocked query.
      */
-    suspend fun recordBlockedQuery(domain: String) = mutex.withLock {
-        sessionBlocked++
-
-        context.statisticsDataStore.edit { preferences ->
-            preferences[BLOCKED_QUERIES] = (preferences[BLOCKED_QUERIES] ?: 0) + 1
-        }
+    fun recordBlockedQuery(domain: String) {
+        sessionBlocked.incrementAndGet()
+        pendingBlocked.incrementAndGet()
+        scheduleFlush()
     }
 
     /**
      * Record a cache hit.
      */
-    suspend fun recordCacheHit() = mutex.withLock {
-        sessionCacheHits++
-
-        context.statisticsDataStore.edit { preferences ->
-            preferences[CACHE_HITS] = (preferences[CACHE_HITS] ?: 0) + 1
-        }
+    fun recordCacheHit() {
+        sessionCacheHits.incrementAndGet()
+        pendingCacheHits.incrementAndGet()
+        scheduleFlush()
     }
 
     /**
      * Record a cache miss.
      */
-    suspend fun recordCacheMiss() = mutex.withLock {
-        sessionCacheMisses++
+    fun recordCacheMiss() {
+        sessionCacheMisses.incrementAndGet()
+        pendingCacheMisses.incrementAndGet()
+        scheduleFlush()
+    }
 
-        context.statisticsDataStore.edit { preferences ->
-            preferences[CACHE_MISSES] = (preferences[CACHE_MISSES] ?: 0) + 1
+    /**
+     * Schedule a flush unless one is already pending. Deferring instead of
+     * running a fixed timer means an idle app never wakes up to write nothing.
+     */
+    private fun scheduleFlush() {
+        if (flushJob != null) return
+        synchronized(this) {
+            if (flushJob != null) return
+            flushJob = scope.launch {
+                try {
+                    delay(FLUSH_INTERVAL_MS)
+                    flush()
+                } finally {
+                    // Held until the write is done, so queries arriving during it
+                    // batch into the next flush instead of starting another one
+                    synchronized(this@StatisticsManager) { flushJob = null }
+                    // Those queries would otherwise wait for the next one to be
+                    // recorded, which on a quiet device can be a long time
+                    if (scope.isActive && hasPendingCounts()) scheduleFlush()
+                }
+            }
+        }
+    }
+
+    private fun hasPendingCounts(): Boolean =
+        pendingQueries.get() > 0 || pendingBlocked.get() > 0 || pendingCacheHits.get() > 0 ||
+            pendingCacheMisses.get() > 0 || pendingBytes.get() > 0
+
+    /**
+     * Write the pending counts to disk. Called periodically while queries come
+     * in, and by the VPN service when it stops so the last batch isn’t lost.
+     */
+    suspend fun flush() = withContext(NonCancellable) {
+        flushMutex.withLock {
+            // Claim the deltas up front; concurrent recording accumulates into
+            // the next batch rather than being dropped by this write
+            val queries = pendingQueries.getAndSet(0)
+            val blocked = pendingBlocked.getAndSet(0)
+            val hits = pendingCacheHits.getAndSet(0)
+            val misses = pendingCacheMisses.getAndSet(0)
+            val bytes = pendingBytes.getAndSet(0)
+
+            if (queries == 0L && blocked == 0L && hits == 0L && misses == 0L && bytes == 0L) {
+                return@withLock
+            }
+
+            try {
+                context.statisticsDataStore.edit { preferences ->
+                    preferences[TOTAL_QUERIES] = preferences.counter(TOTAL_QUERIES) + queries
+                    preferences[BLOCKED_QUERIES] = preferences.counter(BLOCKED_QUERIES) + blocked
+                    preferences[CACHE_HITS] = preferences.counter(CACHE_HITS) + hits
+                    preferences[CACHE_MISSES] = preferences.counter(CACHE_MISSES) + misses
+                    preferences[TOTAL_BYTES] = preferences.counter(TOTAL_BYTES) + bytes
+                    if (preferences.counter(SESSION_START) == 0L) {
+                        preferences[SESSION_START] = System.currentTimeMillis()
+                    }
+                }
+            } catch (e: Exception) {
+                // Put the deltas back so a failed write doesn’t lose them; they
+                // go out with the next flush
+                pendingQueries.addAndGet(queries)
+                pendingBlocked.addAndGet(blocked)
+                pendingCacheHits.addAndGet(hits)
+                pendingCacheMisses.addAndGet(misses)
+                pendingBytes.addAndGet(bytes)
+                // Deliberately not rethrown: every caller is fire-and-forget, and
+                // an escaping exception from a launched coroutine reaches the
+                // thread’s uncaught handler and takes the process down. Losing
+                // statistics is never worth killing the VPN over
+                Log.w(TAG, "Failed to write statistics, keeping the counts pending", e)
+            }
         }
     }
 
     /**
-     * Clear in-memory session counters (caller must hold mutex).
+     * Flush without waiting for it, for callers that can’t suspend (such as
+     * `Service.onDestroy()`). Runs on this manager’s own scope, which outlives
+     * the caller’s.
+     */
+    fun flushNow() {
+        scope.launch { flush() }
+    }
+
+    /**
+     * Stop the periodic flushing and abandon whatever hasn’t been written yet.
+     * The manager is an application-lifetime singleton in production; this is
+     * for tests and for anything else that replaces the instance, so a pending
+     * flush from a discarded manager can’t write during someone else’s work.
+     * Call [flush] first if the counts still matter.
+     */
+    fun close() {
+        scope.cancel()
+        synchronized(this) { flushJob = null }
+    }
+
+    /**
+     * Clear in-memory session counters.
      */
     private fun clearSessionCounters() {
-        sessionQueries = 0
-        sessionBlocked = 0
-        sessionCacheHits = 0
-        sessionCacheMisses = 0
-        sessionBytes = 0L
+        sessionQueries.set(0)
+        sessionBlocked.set(0)
+        sessionCacheHits.set(0)
+        sessionCacheMisses.set(0)
+        sessionBytes.set(0)
     }
 
     /**
      * Reset session statistics.
      */
-    suspend fun resetSession() = mutex.withLock {
+    suspend fun resetSession() {
+        // Flush first so pending queries land in the lifetime totals
+        flush()
         clearSessionCounters()
 
         context.statisticsDataStore.edit { preferences ->

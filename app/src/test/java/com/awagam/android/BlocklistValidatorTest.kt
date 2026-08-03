@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
+import java.net.InetAddress
 
 /**
  * Unit tests for BlocklistValidator.
@@ -60,6 +61,73 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://server.internal/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://server.corp/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://router.home/blocklist.json"))
+    }
+
+    @Test
+    fun `loopback addresses are rejected beyond the canonical one`() {
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://127.0.0.2/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://127.255.255.254/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[::1]/blocklist.json"))
+    }
+
+    @Test
+    fun `IPv6 private and link-local addresses are rejected`() {
+        // Unique local addresses, fc00::/7
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[fd00::1]/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[fc00::1]/blocklist.json"))
+        // Link-local, fe80::/10
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[fe80::1]/blocklist.json"))
+        // Unspecified address
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[::]/blocklist.json"))
+        // IPv4-mapped forms must be judged as the IPv4 address they carry
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[::ffff:169.254.169.254]/blocklist.json"))
+    }
+
+    @Test
+    fun `link-local addresses including the metadata endpoint are rejected`() {
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://169.254.169.254/latest/meta-data"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://169.254.0.1/blocklist.json"))
+    }
+
+    @Test
+    fun `other reserved ranges are rejected`() {
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://0.0.0.0/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://0.1.2.3/blocklist.json"))
+        // CGNAT, 100.64.0.0/10
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://100.64.0.1/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://100.127.255.255/blocklist.json"))
+        // IETF protocol assignments, 192.0.0.0/24
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://192.0.0.1/blocklist.json"))
+        // Benchmarking, 198.18.0.0/15
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://198.18.0.1/blocklist.json"))
+        // Multicast and reserved
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://224.0.0.1/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://240.0.0.1/blocklist.json"))
+        assertFalse(BlocklistValidator.isValidBlocklistUrl("https://255.255.255.255/blocklist.json"))
+    }
+
+    @Test
+    fun `public addresses stay allowed`() {
+        assertTrue(BlocklistValidator.isValidBlocklistUrl("https://1.1.1.1/blocklist.json"))
+        assertTrue(BlocklistValidator.isValidBlocklistUrl("https://100.63.255.255/blocklist.json"))
+        assertTrue(BlocklistValidator.isValidBlocklistUrl("https://192.0.1.1/blocklist.json"))
+        assertTrue(BlocklistValidator.isValidBlocklistUrl("https://[2606:4700:4700::1111]/blocklist.json"))
+    }
+
+    @Test
+    fun `hostnames are not treated as IP literals`() {
+        assertNull(BlocklistValidator.parseIpLiteral("example.com"))
+        assertNull(BlocklistValidator.parseIpLiteral("1.1.1.1.example.com"))
+        assertNotNull(BlocklistValidator.parseIpLiteral("1.1.1.1"))
+        assertNotNull(BlocklistValidator.parseIpLiteral("[::1]"))
+    }
+
+    @Test
+    fun `resolved addresses are classified for the fetch-time check`() {
+        assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("10.1.2.3")))
+        assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("169.254.169.254")))
+        assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("::1")))
+        assertFalse(BlocklistValidator.isBlockedAddress(InetAddress.getByName("8.8.8.8")))
     }
 
     // Bundle Validation Tests

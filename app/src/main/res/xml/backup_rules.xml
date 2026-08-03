@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blocklist configurations are worth restoring onto a new device; the fetched
+    rules and the query statistics are not—the rules are re-downloaded on the
+    next update, and the statistics describe the old device. Anything not
+    included here (the rules in `files/blocklists/`) stays out of the backup.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/blocklists.preferences_pb" />
+    <include domain="file" path="datastore/settings.preferences_pb" />
+</full-backup-content>

@@ -18,6 +18,10 @@ import java.util.Locale
  */
 class BlocklistExporter(private val context: Context) {
 
+    companion object {
+        private const val EXPORT_DIR_NAME = "exports"
+    }
+
     enum class Format(val extension: String, val mimeType: String) {
         PIHOLE("txt", "text/plain"),
         ADGUARD("txt", "text/plain"),
@@ -42,7 +46,10 @@ class BlocklistExporter(private val context: Context) {
         val timestamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
         val filename = "awagam-blocklist-$timestamp.${format.extension}"
 
-        val file = File(context.cacheDir, filename)
+        // Exports live in their own subdirectory so the FileProvider can grant
+        // access to it alone rather than to the whole cache directory
+        val exportDir = File(context.cacheDir, EXPORT_DIR_NAME).apply { mkdirs() }
+        val file = File(exportDir, filename)
         file.writeText(content)
 
         val uri = FileProvider.getUriForFile(

@@ -27,6 +27,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -45,6 +46,12 @@ class AWAGAMVpnService : VpnService() {
         private const val VPN_ADDRESS = "10.0.0.2"
         private const val VPN_DNS = "10.0.0.1"
         private const val VPN_MTU = 1500
+
+        // Upper bound on queries being resolved at once. Each in-flight query
+        // holds a packet copy and can wait up to 5 s on a DoH call, so an app
+        // flooding the tunnel would otherwise grow memory without limit and
+        // saturate the OkHttp dispatcher, slowing down every other query
+        private const val MAX_CONCURRENT_QUERIES = 32
 
         // Check whether VPN service is actively running;
         // volatile for cross-thread visibility
@@ -255,11 +262,19 @@ class AWAGAMVpnService : VpnService() {
             val outputStream = FileOutputStream(vpn.fileDescriptor)
             val outputLock = Any()
             val packet = ByteArray(VPN_MTU)
+            val inFlight = Semaphore(MAX_CONCURRENT_QUERIES)
 
             while (isRunning) {
                 try {
                     val length = inputStream.read(packet)
                     if (length > 0) {
+                        // Drop the query instead of queuing it once the limit is
+                        // reached; DNS clients retry, and answering late is worse
+                        // than not answering at all
+                        if (!inFlight.tryAcquire()) {
+                            Log.w(TAG, "Dropping query: $MAX_CONCURRENT_QUERIES already in flight")
+                            continue
+                        }
                         // Copy packet data so the buffer can be reused immediately
                         val packetCopy = packet.copyOfRange(0, length)
                         // Process each query concurrently so a slow DoH request
@@ -276,6 +291,8 @@ class AWAGAMVpnService : VpnService() {
                                 if (isRunning) {
                                     Log.e(TAG, "Error processing packet", e)
                                 }
+                            } finally {
+                                inFlight.release()
                             }
                         }
                     }
@@ -355,6 +372,8 @@ class AWAGAMVpnService : VpnService() {
             withContext(NonCancellable) {
                 userPreferences.setEnabled(false)
                 pendingStop = false
+                // Persist the queries recorded since the last periodic flush
+                statisticsManager.flush()
             }
         }
 
@@ -390,6 +409,7 @@ class AWAGAMVpnService : VpnService() {
     override fun onDestroy() {
         isRunning = false
         isServiceRunning = false
+        statisticsManager.flushNow()
         vpnInterface?.close()
         vpnInterface = null
         serviceScope.cancel()

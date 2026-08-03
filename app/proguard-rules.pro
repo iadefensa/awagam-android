@@ -24,8 +24,9 @@
 -dontwarn lombok.**
 -dontwarn sun.net.spi.nameservice.**
 
-# Keep Ktor classes
--keep class io.ktor.** { *; }
+# dnsjava logs through SLF4J, whose 1.x API looks for a binding that no Android
+# app provides; without one it falls back to a no-op logger
+-dontwarn org.slf4j.impl.StaticLoggerBinder
 
 # Keep kotlinx.serialization
 -keepattributes *Annotation*, InnerClasses

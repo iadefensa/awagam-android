@@ -16,6 +16,11 @@ class DnsCache {
         private const val DEFAULT_MAX_SIZE = 1000
         private const val MIN_TTL_SECONDS = 60L // Minimum cache time
         private val MAX_TTL_SECONDS = TimeUnit.HOURS.toSeconds(24) // Maximum cache time
+
+        // Negative answers (NXDOMAIN/NODATA) are capped well below the positive
+        // maximum: SOA minimums are often hours, which would keep a freshly
+        // registered or newly published name unresolvable for that long
+        private val MAX_NEGATIVE_TTL_SECONDS = TimeUnit.MINUTES.toSeconds(15)
     }
 
     private val cache = LruCache<String, CacheEntry>(DEFAULT_MAX_SIZE)
@@ -72,12 +77,14 @@ class DnsCache {
 
     /**
      * Cache DNS response with appropriate TTL.
+     * The wire form is stored as received so a cache hit returns exactly what a
+     * cache miss would, rather than a re-serialized copy.
      */
-    fun put(query: Message, response: Message) {
+    fun put(query: Message, response: Message, wire: ByteArray = response.toWire()) {
         val key = generateCacheKey(query)
         val ttl = getEffectiveTtl(response)
         val entry = CacheEntry(
-            response = response.toWire(),
+            response = wire,
             timestamp = System.currentTimeMillis(),
             ttlSeconds = ttl
         )
@@ -87,12 +94,23 @@ class DnsCache {
     /**
      * Get effective TTL from DNS response, clamped to reasonable bounds.
      */
-    private fun getEffectiveTtl(response: Message): Long {
-        // Find minimum TTL from answer records
+    internal fun getEffectiveTtl(response: Message): Long {
         val answers = response.getSection(org.xbill.DNS.Section.ANSWER)
-        val minTtl = answers?.minOfOrNull { record ->
+
+        // Negative answer (NXDOMAIN or NODATA): RFC 2308 puts its lifetime in the
+        // SOA record of the authority section, not in the (absent) answers
+        if (answers.isNullOrEmpty()) {
+            val soa = response.getSection(org.xbill.DNS.Section.AUTHORITY)
+                ?.filterIsInstance<org.xbill.DNS.SOARecord>()
+                ?.firstOrNull()
+            val negativeTtl = soa?.let { minOf(it.ttl, it.minimum) } ?: MIN_TTL_SECONDS
+            return negativeTtl.coerceIn(MIN_TTL_SECONDS, MAX_NEGATIVE_TTL_SECONDS)
+        }
+
+        // Find minimum TTL from answer records
+        val minTtl = answers.minOf { record ->
             if (record.ttl > 0) record.ttl else MIN_TTL_SECONDS
-        } ?: MIN_TTL_SECONDS
+        }
 
         // Clamp to reasonable bounds
         return minTtl.coerceIn(MIN_TTL_SECONDS, MAX_TTL_SECONDS)

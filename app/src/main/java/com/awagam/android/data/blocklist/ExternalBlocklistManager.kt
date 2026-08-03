@@ -26,8 +26,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.ResponseBody
+import java.io.File
+import java.net.InetAddress
+import java.net.UnknownHostException
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,7 +50,9 @@ class ExternalBlocklistManager(private val context: Context) {
     companion object {
         private const val TAG = "ExternalBlocklistManager"
         private val BLOCKLIST_CONFIGS = stringPreferencesKey("blocklist_configs")
-        private val BLOCKLIST_CACHE_PREFIX = "blocklist_cache_"
+        // Only read now, to migrate bodies stored by earlier versions
+        private const val BLOCKLIST_CACHE_PREFIX = "blocklist_cache_"
+        private const val CACHE_DIR_NAME = "blocklists"
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         // Bundle imports are fetched concurrently in batches within an overall
@@ -329,7 +337,28 @@ class ExternalBlocklistManager(private val context: Context) {
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        // URL validation can only judge the hostname; this rejects the address it
+        // resolves to, so a public name pointing at an internal host (or at the
+        // cloud metadata endpoint) can’t be used to make the app fetch from it
+        .dns(publicOnlyDns())
+        // Only HTTPS sources are accepted, so a redirect must not be able to
+        // drop the connection down to plain HTTP
+        .followSslRedirects(false)
         .build()
+
+    /**
+     * System DNS restricted to publicly routable results.
+     */
+    private fun publicOnlyDns(): Dns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            val addresses = Dns.SYSTEM.lookup(hostname)
+            val public = addresses.filterNot { BlocklistValidator.isBlockedAddress(it) }
+            if (public.isEmpty()) {
+                throw UnknownHostException("$hostname resolves to a non-public address")
+            }
+            return public
+        }
+    }
 
     /**
      * Flow of all configured external blocklists.
@@ -397,9 +426,10 @@ class ExternalBlocklistManager(private val context: Context) {
             val current = getCurrentConfigs(preferences)
             val updated = current.filter { it.id != id }
             preferences[BLOCKLIST_CONFIGS] = json.encodeToString(updated)
-            // Also remove cached data
+            // Also remove data cached by versions that stored it here
             preferences.remove(stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id))
         }
+        withContext(Dispatchers.IO) { cacheFile(id).delete() }
     }
 
     /**
@@ -499,9 +529,7 @@ class ExternalBlocklistManager(private val context: Context) {
             }
 
             // Cache the blocklist (bundles are cached as their merged blocklist)
-            context.blocklistDataStore.edit { preferences ->
-                preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)] = bodyToCache
-            }
+            writeCacheFile(id, bodyToCache)
 
             // Update with success status and validated metadata; bundles with
             // skipped imports stay active but carry a warning naming them
@@ -590,7 +618,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
         httpClient.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                val body = response.body.string()
+                val body = readCapped(response.body)
 
                 // Parse GitHub API response
                 val apiResponse = json.parseToJsonElement(body).jsonObject
@@ -620,13 +648,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
         httpClient.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                // Reject oversized responses before reading the body into memory
-                // (“-1” means the length is unknown—then the post-download checks apply)
-                val contentLength = response.body.contentLength()
-                if (contentLength > MAX_BLOCKLIST_SIZE) {
-                    throw Exception("Blocklist too large. Maximum size is 10 MB.")
-                }
-                val body = response.body.string()
+                val body = readCapped(response.body)
                 // Check if we got HTML instead of JSON (common error)
                 val trimmed = body.trimStart()
                 if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
@@ -637,6 +659,19 @@ class ExternalBlocklistManager(private val context: Context) {
                 throw Exception("HTTP ${response.code}")
             }
         }
+    }
+
+    /**
+     * Read a response body, refusing anything over [MAX_BLOCKLIST_SIZE].
+     * The declared content length can’t be relied on—a chunked response reports
+     * none, so the cap has to hold while reading rather than before it.
+     */
+    private fun readCapped(body: ResponseBody): String {
+        val source = body.source()
+        if (source.request(MAX_BLOCKLIST_SIZE + 1L)) {
+            throw Exception("Blocklist too large. Maximum size is 10 MB.")
+        }
+        return source.readString(Charsets.UTF_8)
     }
 
     private fun calculateMetadata(groups: Map<String, BlocklistGroup>): BlocklistMetadata {
@@ -698,9 +733,17 @@ class ExternalBlocklistManager(private val context: Context) {
     /**
      * Get cached blocklist data for a specific config.
      */
-    suspend fun getCachedBlocklist(id: String): String? {
-        val preferences = context.blocklistDataStore.data.first()
-        return preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)]
+    suspend fun getCachedBlocklist(id: String): String? = withContext(Dispatchers.IO) {
+        val file = cacheFile(id)
+        if (file.exists()) {
+            return@withContext try {
+                file.readText()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to read cached blocklist for $id", e)
+                null
+            }
+        }
+        migrateCacheFromPreferences(id)
     }
 
     /**
@@ -708,15 +751,69 @@ class ExternalBlocklistManager(private val context: Context) {
      */
     suspend fun getAllCachedBlocklists(): Map<String, String> = withContext(Dispatchers.IO) {
         val result = mutableMapOf<String, String>()
-        val preferences = context.blocklistDataStore.data.first()
-        val configs = getCurrentConfigs(preferences)
-        configs.filter { it.enabled }.forEach { config ->
-            val cached = preferences[stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + config.id)]
+        getConfigsSnapshot().filter { it.enabled }.forEach { config ->
+            val cached = getCachedBlocklist(config.id)
             if (cached != null) {
                 result[config.id] = cached
             }
         }
         result
+    }
+
+    /**
+     * Where a blocklist’s rules are stored. Bodies live in files rather than in
+     * the preferences DataStore: that store is read and rewritten in full on
+     * every access, so keeping multi-megabyte lists in it would churn tens of
+     * megabytes for something as small as toggling one list on or off.
+     *
+     * IDs come from imported configs and are not trustworthy as file names, so
+     * the name is sanitized and disambiguated with a digest of the original.
+     * The digest is a cryptographic one because sanitizing is lossy: two IDs
+     * that differ only in stripped characters must not share a file, and
+     * `hashCode` collisions are easy enough to construct for an imported
+     * config to overwrite another list’s rules.
+     */
+    private fun cacheFile(id: String): File {
+        val dir = File(context.filesDir, CACHE_DIR_NAME)
+        val safeId = id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(64)
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(id.toByteArray(Charsets.UTF_8))
+            .take(8)
+            .joinToString("") { "%02x".format(it) }
+        return File(dir, "$safeId-$digest.json")
+    }
+
+    /**
+     * Write a blocklist body, replacing any previous one. Written to a
+     * temporary file first so an interrupted write can’t leave a half-written
+     * list that would fail to parse on the next load.
+     */
+    private fun writeCacheFile(id: String, body: String) {
+        val file = cacheFile(id)
+        file.parentFile?.mkdirs()
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        temp.writeText(body)
+        if (!temp.renameTo(file)) {
+            temp.delete()
+            throw Exception("Failed to store the blocklist on disk")
+        }
+    }
+
+    /**
+     * Move a body cached by an earlier version out of the DataStore and into a
+     * file, returning it. Returns null when there is nothing cached.
+     */
+    private suspend fun migrateCacheFromPreferences(id: String): String? {
+        val key = stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)
+        val legacy = context.blocklistDataStore.data.first()[key] ?: return null
+        try {
+            writeCacheFile(id, legacy)
+            context.blocklistDataStore.edit { preferences -> preferences.remove(key) }
+            Log.d(TAG, "Migrated cached blocklist $id to file storage")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to migrate cached blocklist $id to file storage", e)
+        }
+        return legacy
     }
 
     private fun getCurrentConfigs(preferences: Preferences): List<ExternalBlocklistConfig> {
