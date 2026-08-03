@@ -24,7 +24,7 @@ data class HomeUiState(
     val isEnabled: Boolean = false,
     val tldCount: Int = 0,
     val domainCount: Int = 0,
-    val blockedCount: Int = 0,
+    val blockedCount: Long = 0,
     val isTemporarilyDisabled: Boolean = false,
     val disableCountdownSeconds: Int = 0,
     val vpnError: String? = null,

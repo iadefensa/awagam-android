@@ -33,6 +33,10 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         private const val TAG = "DnsResolver"
         private const val DOH_CONTENT_TYPE = "application/dns-message"
 
+        // A DNS message can’t exceed 65535 bytes; anything larger is a broken or
+        // hostile upstream, and reading it would be unbounded memory per query
+        private const val MAX_DNS_RESPONSE_SIZE = 65535L
+
         // Blocked response: 0.0.0.0 for A records, :: for AAAA records
         private val BLOCKED_IPV4 = InetAddress.getByName("0.0.0.0")
         private val BLOCKED_IPV6 = InetAddress.getByName("::")
@@ -385,14 +389,10 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                     Log.d(TAG, "Cache miss: $hostname")
                     statisticsManager?.recordCacheMiss()
                     // Forward to upstream DoH server
-                    val upstreamResponse = forwardToUpstream(dnsPayload)
+                    val upstreamResponse = forwardToUpstream(dnsPayload)?.let {
+                        acceptUpstreamResponse(query, it)
+                    }
                     if (upstreamResponse != null) {
-                        try {
-                            val responseMessage = Message(upstreamResponse)
-                            dnsCache.put(query, responseMessage)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to cache upstream response", e)
-                        }
                         upstreamResponse
                     } else {
                         // Return SERVFAIL so the client gets a proper DNS error
@@ -443,6 +443,50 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return response.toWire()
     }
 
+    /**
+     * Check an upstream response against the query before it is handed to the
+     * client or cached, and cache it when it is worth caching.
+     * Returns the response to send back, or null to fail the query.
+     */
+    private fun acceptUpstreamResponse(query: Message, response: ByteArray): ByteArray? {
+        val responseMessage = try {
+            Message(response)
+        } catch (e: Exception) {
+            Log.w(TAG, "Upstream returned an unparsable response", e)
+            return null
+        }
+
+        // A response whose question doesn’t match the query answers something
+        // else; serving or caching it would put a foreign answer under this key
+        val question = responseMessage.question
+        if (question == null || question != query.question) {
+            Log.w(TAG, "Upstream response question does not match the query")
+            return null
+        }
+
+        // Only cache answers a resolver may reuse: failures are transient, and a
+        // truncated answer is incomplete by definition
+        val rcode = responseMessage.header.rcode
+        val cacheable = !responseMessage.header.getFlag(Flags.TC.toInt()) &&
+                (rcode == Rcode.NOERROR || rcode == Rcode.NXDOMAIN)
+        if (cacheable) {
+            dnsCache.put(query, responseMessage, response)
+        }
+
+        // The transaction ID is what the client matches on, so make sure it is
+        // the one it sent even if the upstream echoed something else. Patching a
+        // copy keeps the cached entry as it was received, since cache hits set
+        // the ID of whichever query they answer
+        val queryId = query.header.id
+        if (responseMessage.header.id == queryId) {
+            return response
+        }
+        val patched = response.copyOf()
+        patched[0] = ((queryId shr 8) and 0xFF).toByte()
+        patched[1] = (queryId and 0xFF).toByte()
+        return patched
+    }
+
     private fun forwardToUpstream(dnsPayload: ByteArray): ByteArray? {
         val request = Request.Builder()
             .url(upstreamDnsUrl)
@@ -453,9 +497,17 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
+                    // Read with a hard cap rather than `bytes()`, which would buffer
+                    // however much the upstream chooses to send (chunked responses
+                    // don’t announce a length up front)
+                    val source = response.body.source()
+                    if (source.request(MAX_DNS_RESPONSE_SIZE + 1)) {
+                        Log.w(TAG, "DoH response exceeds $MAX_DNS_RESPONSE_SIZE bytes")
+                        return@use null
+                    }
                     // A zero-length body would otherwise be wrapped into an empty
                     // DNS packet; treat it as a failure so the caller returns SERVFAIL
-                    response.body.bytes().takeIf { it.isNotEmpty() }
+                    source.readByteArray().takeIf { it.isNotEmpty() }
                         ?: run {
                             Log.w(TAG, "DoH returned an empty body")
                             null

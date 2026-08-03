@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.IDN
+import java.net.InetAddress
 import java.net.URL
 
 /**
@@ -41,6 +42,10 @@ object BlocklistValidator {
     /**
      * Validate blocklist URL for security.
      * Only allows HTTPS, blocks private/internal networks.
+     *
+     * This is a check on the URL alone. A public hostname can still resolve to
+     * an internal address, so the address a request actually connects to is
+     * checked again at fetch time via `[isBlockedAddress]`.
      */
     fun isValidBlocklistUrl(url: String): Boolean {
         return try {
@@ -52,23 +57,19 @@ object BlocklistValidator {
             }
 
             val hostname = parsed.host.lowercase()
-
-            // Block localhost
-            if (hostname == "localhost" || hostname == "127.0.0.1") {
+            if (hostname.isEmpty()) {
                 return false
             }
 
-            // Block private IP ranges
-            val ipRegex = Regex("""^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$""")
-            val ipMatch = ipRegex.matchEntire(hostname)
-            if (ipMatch != null) {
-                val parts = ipMatch.groupValues.drop(1).map { it.toInt() }
-                // Private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-                if (parts[0] == 10 ||
-                    (parts[0] == 172 && parts[1] in 16..31) ||
-                    (parts[0] == 192 && parts[1] == 168)) {
-                    return false
-                }
+            // Block localhost
+            if (hostname == "localhost" || hostname.endsWith(".localhost")) {
+                return false
+            }
+
+            // Block IP literals pointing anywhere but the public internet
+            val literal = parseIpLiteral(hostname)
+            if (literal != null) {
+                return !isBlockedAddress(literal)
             }
 
             // Block internal domains
@@ -81,6 +82,74 @@ object BlocklistValidator {
         } catch (e: Exception) {
             false
         }
+    }
+
+    /**
+     * Parse a hostname that is an IP address literal, or return null if it is a
+     * name. Only literals are parsed—passing a name to `InetAddress` here would
+     * resolve it over the network.
+     */
+    fun parseIpLiteral(hostname: String): InetAddress? {
+        // `URL.getHost()` keeps the brackets around an IPv6 literal
+        val candidate = if (hostname.startsWith("[") && hostname.endsWith("]")) {
+            hostname.substring(1, hostname.length - 1)
+        } else {
+            hostname
+        }
+
+        val isIpv4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""").matches(candidate)
+        val isIpv6 = candidate.contains(":") &&
+            Regex("""^[0-9a-fA-F:.]+$""").matches(candidate)
+        if (!isIpv4 && !isIpv6) return null
+
+        return try {
+            // Resolves nothing for a literal, so no lookup is performed
+            InetAddress.getByName(candidate)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Whether an address is outside the public internet, and so must not be
+     * fetched from: loopback, private, link-local (including the cloud metadata
+     * endpoint), shared/CGNAT, multicast, and reserved ranges.
+     */
+    fun isBlockedAddress(address: InetAddress): Boolean {
+        if (address.isAnyLocalAddress ||
+            address.isLoopbackAddress ||
+            address.isLinkLocalAddress ||
+            address.isSiteLocalAddress ||
+            address.isMulticastAddress
+        ) {
+            return true
+        }
+
+        val bytes = address.address
+        // `InetAddress` maps IPv4-in-IPv6 forms to `Inet4Address`, so a
+        // four-byte address here covers both notations
+        if (bytes.size == 4) {
+            val first = bytes[0].toInt() and 0xFF
+            val second = bytes[1].toInt() and 0xFF
+            val third = bytes[2].toInt() and 0xFF
+            return when {
+                first == 0 -> true                          // 0.0.0.0/8 “this network”
+                first == 100 && second in 64..127 -> true   // 100.64.0.0/10 CGNAT
+                first == 192 && second == 0 && third == 0 -> true // 192.0.0.0/24 IETF protocol assignments
+                first == 198 && second in 18..19 -> true    // 198.18.0.0/15 benchmarking
+                first >= 240 -> true                        // 240.0.0.0/4 reserved, incl. broadcast
+                else -> false
+            }
+        }
+
+        if (bytes.size == 16) {
+            val first = bytes[0].toInt() and 0xFF
+            // fc00::/7 unique local addresses—`isSiteLocalAddress` only covers
+            // the deprecated fec0::/10
+            return (first and 0xFE) == 0xFC
+        }
+
+        return false
     }
 
     /**

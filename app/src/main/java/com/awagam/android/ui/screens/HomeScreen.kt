@@ -72,7 +72,7 @@ import com.awagam.android.ui.viewmodel.HomeViewModel
  * Format a number compactly for display in space-constrained cards.
  * Examples: 0 → 0, 999 → 999, 1000 → 1K, 1200 → 1.2K, 12345 → 12.3K, 1000000 → 1M
  */
-private fun formatCompact(value: Int): String {
+private fun formatCompact(value: Long): String {
     return when {
         value < 1_000 -> value.toString()
         value < 1_000_000 -> {
@@ -296,13 +296,13 @@ fun HomeScreen(
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label = "TLDs",
-                    value = formatCompact(uiState.tldCount),
+                    value = formatCompact(uiState.tldCount.toLong()),
                     description = "${NumberFormat.getNumberInstance().format(uiState.tldCount)} top-level domains blocked"
                 )
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label = "Domains",
-                    value = formatCompact(uiState.domainCount),
+                    value = formatCompact(uiState.domainCount.toLong()),
                     description = "${NumberFormat.getNumberInstance().format(uiState.domainCount)} domains blocked"
                 )
                 StatCard(
