@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android.data.blocklist
 
 import android.content.Context
@@ -588,7 +590,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
         httpClient.newCall(request).execute().use { response ->
             if (response.isSuccessful) {
-                val body = response.body?.string() ?: return null
+                val body = response.body.string()
 
                 // Parse GitHub API response
                 val apiResponse = json.parseToJsonElement(body).jsonObject
@@ -620,13 +622,14 @@ class ExternalBlocklistManager(private val context: Context) {
             if (response.isSuccessful) {
                 // Reject oversized responses before reading the body into memory
                 // (“-1” means the length is unknown—then the post-download checks apply)
-                val contentLength = response.body?.contentLength() ?: -1L
+                val contentLength = response.body.contentLength()
                 if (contentLength > MAX_BLOCKLIST_SIZE) {
                     throw Exception("Blocklist too large. Maximum size is 10 MB.")
                 }
-                val body = response.body?.string()
+                val body = response.body.string()
                 // Check if we got HTML instead of JSON (common error)
-                if (body != null && body.trimStart().startsWith("<!DOCTYPE") || body?.trimStart()?.startsWith("<html") == true) {
+                val trimmed = body.trimStart()
+                if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
                     throw Exception("Received HTML instead of JSON. Use raw/direct URL.")
                 }
                 return body

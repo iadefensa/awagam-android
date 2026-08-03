@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android.ui.theme
 
 import android.os.Build

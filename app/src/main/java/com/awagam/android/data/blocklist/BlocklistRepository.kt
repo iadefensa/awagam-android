@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android.data.blocklist
 
 import android.content.Context
@@ -7,9 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import java.net.IDN
 
 /**
  * Repository for managing blocklists.
@@ -19,7 +21,6 @@ class BlocklistRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "BlocklistRepository"
-        private const val BUILTIN_BLOCKLIST = "blocklist.json"
     }
 
     private val json = Json {
@@ -29,11 +30,13 @@ class BlocklistRepository(private val context: Context) {
 
     private val externalBlocklistManager = ExternalBlocklistManager(context)
 
-    // Normalized sets for fast lookups
-    private val blockedTlds = mutableSetOf<String>()
-    private val blockedDomains = mutableSetOf<String>()
-    private val blockedUrls = mutableSetOf<String>() // For export to Pi-hole/AdGuard
-    private var externalSourceCount = 0
+    // Swapped atomically after a load completes so in-flight DNS queries always
+    // see a complete rule set, never a cleared or half-populated one
+    @Volatile
+    private var matcher: DomainMatcher = DomainMatcher.EMPTY
+
+    @Volatile
+    private var blockedUrls: Set<String> = emptySet() // For export to Pi-hole/AdGuard
 
     private val _blocklistStats = MutableStateFlow(BlocklistStats())
     val blocklistStats: StateFlow<BlocklistStats> = _blocklistStats.asStateFlow()
@@ -42,94 +45,77 @@ class BlocklistRepository(private val context: Context) {
     val blockedCount: StateFlow<Int> = _blockedCount.asStateFlow()
 
     /**
-     * Load blocklists from built-in assets and any configured external sources.
+     * Load blocklists from the user’s configured sources.
+     * The app ships with no rules of its own—all blocking is user-configured.
      */
     suspend fun loadBlocklists() = withContext(Dispatchers.IO) {
-        blockedTlds.clear()
-        blockedDomains.clear()
-        blockedUrls.clear()
+        // Build into fresh collections, then publish; the live matcher stays
+        // intact and keeps blocking for the duration of the load
+        val builder = DomainMatcher.Companion.Builder()
+        val urls = mutableSetOf<String>()
 
-        // Load built-in blocklist
-        loadBuiltinBlocklist()
+        val sourceCount = loadExternalBlocklists(builder, urls)
 
-        // Load external blocklists
-        loadExternalBlocklists()
+        val loaded = builder.build()
+        matcher = loaded
+        blockedUrls = urls.toSet()
 
-        updateStats()
-        Log.d(TAG, "Loaded ${blockedTlds.size} TLDs, ${blockedDomains.size} domains, ${blockedUrls.size} URLs")
+        _blocklistStats.value = BlocklistStats(
+            tldCount = loaded.tldCount,
+            domainCount = loaded.domainCount,
+            urlCount = blockedUrls.size,
+            sourceCount = sourceCount
+        )
+        Log.d(TAG, "Loaded ${loaded.tldCount} TLDs, ${loaded.domainCount} domains, ${blockedUrls.size} URLs")
     }
 
-    private suspend fun loadExternalBlocklists() {
-        externalSourceCount = 0
+    /** Returns the number of external sources that loaded successfully. */
+    private suspend fun loadExternalBlocklists(
+        builder: DomainMatcher.Companion.Builder,
+        urls: MutableSet<String>
+    ): Int {
+        var count = 0
         try {
             val configs = externalBlocklistManager.blocklistsFlow.first()
             configs.filter { it.enabled }.forEach { config ->
                 val cached = externalBlocklistManager.getCachedBlocklist(config.id)
-                if (cached != null) {
-                    parseBlocklist(cached)
-                    externalSourceCount++
+                if (cached != null && parseBlocklist(cached, builder, urls)) {
+                    count++
                     Log.d(TAG, "Loaded blocklist: ${config.name}")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load blocklists", e)
         }
+        return count
     }
 
-    private fun loadBuiltinBlocklist() {
-        try {
-            val jsonString = context.assets.open(BUILTIN_BLOCKLIST).bufferedReader().use {
-                it.readText()
-            }
-            parseBlocklist(jsonString)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load built-in blocklist", e)
-        }
-    }
-
-    private fun parseBlocklist(jsonString: String) {
-        try {
+    /**
+     * Returns true if the source parsed. An empty but valid list still counts as a
+     * source—a user’s list may legitimately be empty.
+     */
+    private fun parseBlocklist(
+        jsonString: String,
+        builder: DomainMatcher.Companion.Builder,
+        urls: MutableSet<String>
+    ): Boolean {
+        return try {
             val groups: Map<String, BlocklistGroup> = json.decodeFromString(jsonString)
 
             groups.values.forEach { group ->
-                // Normalize TLDs (ensure they start with a dot)
-                group.tlds.forEach { tld ->
-                    val normalized = if (tld.startsWith(".")) tld else ".$tld"
-                    blockedTlds.add(normalized.lowercase())
-                }
-
-                // Normalize domains (convert IDN to punycode, strip www prefix)
-                group.domains.forEach { domain ->
-                    val normalized = normalizeDomain(domain).removePrefix("www.")
-                    blockedDomains.add(normalized)
-                }
+                group.tlds.forEach { builder.addTld(it) }
+                group.domains.forEach { builder.addDomain(it) }
 
                 // Store URLs for export to Pi-hole/AdGuard
                 // (URLs can’t be blocked at DNS level, but other tools can use them)
-                group.urls.forEach { url ->
-                    blockedUrls.add(url.trim())
-                }
+                group.urls.forEach { urls.add(it.trim()) }
             }
+
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse blocklist JSON", e)
+            false
         }
-    }
-
-    private fun normalizeDomain(domain: String): String {
-        return try {
-            IDN.toASCII(domain.lowercase().trim())
-        } catch (e: Exception) {
-            domain.lowercase().trim()
-        }
-    }
-
-    private fun updateStats() {
-        _blocklistStats.value = BlocklistStats(
-            tldCount = blockedTlds.size,
-            domainCount = blockedDomains.size,
-            urlCount = blockedUrls.size,
-            sourceCount = 1 + externalSourceCount
-        )
     }
 
     /**
@@ -137,35 +123,10 @@ class BlocklistRepository(private val context: Context) {
      * Checks against both TLD and domain blocklists.
      */
     fun isBlocked(hostname: String): Boolean {
-        val normalized = normalizeDomain(hostname)
-
-        // Check exact domain match
-        if (blockedDomains.contains(normalized)) {
-            incrementBlockedCount()
-            return true
-        }
-
-        // Check subdomain matches (e.g., sub.blocked.com matches blocked.com)
-        blockedDomains.forEach { blockedDomain ->
-            if (normalized.endsWith(".$blockedDomain")) {
-                incrementBlockedCount()
-                return true
-            }
-        }
-
-        // Check TLD matches
-        blockedTlds.forEach { tld ->
-            if (normalized.endsWith(tld)) {
-                incrementBlockedCount()
-                return true
-            }
-        }
-
-        return false
-    }
-
-    private fun incrementBlockedCount() {
-        _blockedCount.value++
+        if (!matcher.isBlocked(hostname)) return false
+        // Queries are resolved concurrently, so increment atomically
+        _blockedCount.update { it + 1 }
+        return true
     }
 
     /**
@@ -178,12 +139,12 @@ class BlocklistRepository(private val context: Context) {
     /**
      * Get all blocked TLDs for export.
      */
-    fun getBlockedTlds(): Set<String> = blockedTlds.toSet()
+    fun getBlockedTlds(): Set<String> = matcher.tlds
 
     /**
      * Get all blocked domains for export.
      */
-    fun getBlockedDomains(): Set<String> = blockedDomains.toSet()
+    fun getBlockedDomains(): Set<String> = matcher.domains
 
     /**
      * Get all blocked URLs for export (for Pi-hole/AdGuard).

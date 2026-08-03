@@ -1,4 +1,4 @@
-name: "Tests"
+name: "Build and tests"
 
 on:
   push:
@@ -27,3 +27,18 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: "Run unit tests"
         run: ./gradlew testDebugUnitTest
+
+  release-build:
+    name: "Release build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out repository"
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: "Set up Gradle"
+        uses: gradle/actions/setup-gradle@v6
+      # Exercises R8 and lintVitalRelease, which the debug build does not cover;
+      # unsigned here, as signing keys stay out of CI
+      - name: "Assemble release"
+        run: ./gradlew assembleRelease

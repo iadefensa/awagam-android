@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android
 
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.net.IDN
+import com.awagam.android.data.blocklist.DomainMatcher
 
 /**
  * Unit tests for domain/TLD matching logic.
@@ -155,53 +157,16 @@ class DomainMatcherTest {
     }
 
     /**
-     * Test implementation of domain matcher that mirrors BlocklistRepository logic.
+     * Adapter over the production builder, so tests can add rules incrementally
+     * while the matcher itself stays immutable.
      */
     class TestDomainMatcher {
-        private val blockedTlds = mutableSetOf<String>()
-        private val blockedDomains = mutableSetOf<String>()
+        private val builder = DomainMatcher.Companion.Builder()
 
-        fun addTld(tld: String) {
-            val normalized = if (tld.startsWith(".")) tld else ".$tld"
-            blockedTlds.add(normalized.lowercase())
-        }
+        fun addTld(tld: String) = builder.addTld(tld)
 
-        fun addDomain(domain: String) {
-            val normalized = normalizeDomain(domain).removePrefix("www.")
-            blockedDomains.add(normalized)
-        }
+        fun addDomain(domain: String) = builder.addDomain(domain)
 
-        fun isBlocked(hostname: String): Boolean {
-            val normalized = normalizeDomain(hostname)
-
-            // Check exact domain match
-            if (blockedDomains.contains(normalized)) {
-                return true
-            }
-
-            // Check subdomain matches
-            for (blockedDomain in blockedDomains) {
-                if (normalized.endsWith(".$blockedDomain")) {
-                    return true
-                }
-            }
-
-            // Check TLD matches
-            for (tld in blockedTlds) {
-                if (normalized.endsWith(tld)) {
-                    return true
-                }
-            }
-
-            return false
-        }
-
-        private fun normalizeDomain(domain: String): String {
-            return try {
-                IDN.toASCII(domain.lowercase().trim())
-            } catch (e: Exception) {
-                domain.lowercase().trim()
-            }
-        }
+        fun isBlocked(hostname: String): Boolean = builder.build().isBlocked(hostname)
     }
 }

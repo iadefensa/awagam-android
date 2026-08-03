@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import java.text.NumberFormat
@@ -239,10 +240,10 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 BatteryOptimizationCard(
                     onExempt = {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        }
-                        context.startActivity(intent)
+                        // The one-tap `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog needs
+                        // a Play-restricted permission; this opens the exemption list instead,
+                        // where the user selects AWAGAM
+                        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                     },
                     onDismiss = { viewModel.dismissBatteryPrompt() }
                 )

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android.dns
 
 import android.util.Log
@@ -276,7 +278,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
 
                 // For other hostnames, fall back to system DNS
                 // This shouldn’t happen for DoH servers, but just in case
-                Log.w(TAG, "No hardcoded IPs for $hostname, using system DNS")
+                Log.w(TAG, "No hardcoded IPs for DoH server, using system DNS")
                 return Dns.SYSTEM.lookup(hostname)
             }
         }
@@ -324,7 +326,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful && response.body != null) {
+                if (response.isSuccessful) {
                     Log.d(TAG, "DoH connectivity test passed (${response.code})")
                     null
                 } else {
@@ -389,13 +391,13 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                             val responseMessage = Message(upstreamResponse)
                             dnsCache.put(query, responseMessage)
                         } catch (e: Exception) {
-                            Log.w(TAG, "Failed to cache response for $hostname", e)
+                            Log.w(TAG, "Failed to cache upstream response", e)
                         }
                         upstreamResponse
                     } else {
                         // Return SERVFAIL so the client gets a proper DNS error
                         // instead of timing out with no response
-                        Log.w(TAG, "DoH failed for $hostname, returning SERVFAIL")
+                        Log.w(TAG, "DoH failed, returning SERVFAIL")
                         createServfailResponse(query)
                     }
                 }
@@ -451,7 +453,13 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    response.body?.bytes()
+                    // A zero-length body would otherwise be wrapped into an empty
+                    // DNS packet; treat it as a failure so the caller returns SERVFAIL
+                    response.body.bytes().takeIf { it.isNotEmpty() }
+                        ?: run {
+                            Log.w(TAG, "DoH returned an empty body")
+                            null
+                        }
                 } else {
                     Log.w(TAG, "DoH request failed: ${response.code}")
                     null

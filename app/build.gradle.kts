@@ -10,7 +10,7 @@ plugins {
 // Set base archive name for AAB bundles
 base.archivesName.set("awagam")
 
-val appVersionName = "1.0.0-beta"
+val appVersionName = "1.0.0"
 
 // Load keystore properties if available
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -53,7 +53,9 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                // Resolve against the project root, where `keystore.properties` lives,
+                // rather than the app module—`file()` would use the latter
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
