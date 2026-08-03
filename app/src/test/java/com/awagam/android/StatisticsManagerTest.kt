@@ -7,7 +7,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.awagam.android.statistics.StatisticsManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,8 +30,22 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class StatisticsManagerTest {
 
+    private val managers = mutableListOf<StatisticsManager>()
+
+    /**
+     * Every manager is closed after the test: each one recording a count arms a
+     * delayed flush on its own scope, and one firing during a later test would
+     * shift the totals that test is measuring against.
+     */
+    @After
+    fun tearDown() {
+        managers.forEach { it.close() }
+        managers.clear()
+    }
+
     private fun manager(): StatisticsManager =
         StatisticsManager(ApplicationProvider.getApplicationContext<Application>())
+            .also { managers.add(it) }
 
     private suspend fun stored(): StatisticsManager.Statistics =
         manager().statisticsFlow.first()
@@ -79,6 +96,15 @@ class StatisticsManagerTest {
         statistics.flush()
 
         assertEquals(4L, stored().totalQueries - before.totalQueries)
+    }
+
+    @Test
+    fun `the flow re-emits on its own so the UI does not freeze between flushes`() = runTest {
+        // Recording only touches memory, so without a periodic re-emission the
+        // displayed counters would sit still until the next flush
+        val emissions = manager().statisticsFlow.take(3).toList()
+
+        assertEquals(3, emissions.size)
     }
 
     @Test

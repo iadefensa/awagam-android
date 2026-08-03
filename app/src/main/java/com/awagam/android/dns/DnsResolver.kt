@@ -456,6 +456,11 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
             return null
         }
 
+        if (!responseMessage.header.getFlag(Flags.QR.toInt())) {
+            Log.w(TAG, "Upstream returned a query rather than a response")
+            return null
+        }
+
         // A response whose question doesn’t match the query answers something
         // else; serving or caching it would put a foreign answer under this key
         val question = responseMessage.question

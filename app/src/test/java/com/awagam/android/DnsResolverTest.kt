@@ -55,10 +55,13 @@ class DnsResolverTest {
         type: Int = Type.A,
         rcode: Int = Rcode.NOERROR,
         truncated: Boolean = false,
-        withAnswer: Boolean = true
+        withAnswer: Boolean = true,
+        isResponse: Boolean = true
     ): Message {
         val response = Message(id)
-        response.header.setFlag(Flags.QR.toInt())
+        if (isResponse) {
+            response.header.setFlag(Flags.QR.toInt())
+        }
         response.header.rcode = rcode
         if (truncated) {
             response.header.setFlag(Flags.TC.toInt())
@@ -120,6 +123,16 @@ class DnsResolverTest {
         bare.header.setFlag(Flags.QR.toInt())
 
         assertNull(resolver.acceptUpstreamResponse(query(), bare.toWire()))
+        assertEquals(0, cacheSize())
+    }
+
+    @Test
+    fun `a message without the QR flag is rejected and not cached`() {
+        // A query echoed back would otherwise pass every other check: It parses,
+        // its question matches, and it carries the default NOERROR
+        val wire = response(isResponse = false, withAnswer = false).toWire()
+
+        assertNull(resolver.acceptUpstreamResponse(query(), wire))
         assertEquals(0, cacheSize())
     }
 

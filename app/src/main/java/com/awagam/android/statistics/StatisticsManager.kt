@@ -3,6 +3,7 @@
 package com.awagam.android.statistics
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -18,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -40,6 +42,8 @@ private val Context.statisticsDataStore: DataStore<Preferences> by preferencesDa
 class StatisticsManager(private val context: Context) {
 
     companion object {
+        private const val TAG = "StatisticsManager"
+
         private val TOTAL_QUERIES = longPreferencesKey("total_queries")
         private val BLOCKED_QUERIES = longPreferencesKey("blocked_queries")
         private val CACHE_HITS = longPreferencesKey("cache_hits")
@@ -48,6 +52,9 @@ class StatisticsManager(private val context: Context) {
         private val TOTAL_BYTES = longPreferencesKey("total_bytes")
 
         private val FLUSH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30)
+
+        // How often a collecting screen re-reads the counters
+        private val DISPLAY_REFRESH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(1)
     }
 
     private val flushMutex = Mutex()
@@ -100,11 +107,25 @@ class StatisticsManager(private val context: Context) {
         val lastQueried: Long
     )
 
+    /**
+     * Paces UI updates. Recording no longer writes to disk on every query, so
+     * the DataStore alone would only re-emit once per flush and leave the
+     * displayed counters frozen in between. This is cold: it ticks only while a
+     * screen is collecting, and costs nothing when none is.
+     */
+    private val displayTicker: Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(DISPLAY_REFRESH_INTERVAL_MS)
+        }
+    }
+
     // Flow of current statistics
     val statisticsFlow: Flow<Statistics> = combine(
         context.statisticsDataStore.data,
-        refreshTrigger
-    ) { preferences, _ ->
+        refreshTrigger,
+        displayTicker
+    ) { preferences, _, _ ->
         val storedSessionStart = preferences.counter(SESSION_START)
         val sessionUptime = if (storedSessionStart > 0L) {
             System.currentTimeMillis() - storedSessionStart
@@ -246,13 +267,18 @@ class StatisticsManager(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                // Put the deltas back so a failed write doesn’t lose them
+                // Put the deltas back so a failed write doesn’t lose them; they
+                // go out with the next flush
                 pendingQueries.addAndGet(queries)
                 pendingBlocked.addAndGet(blocked)
                 pendingCacheHits.addAndGet(hits)
                 pendingCacheMisses.addAndGet(misses)
                 pendingBytes.addAndGet(bytes)
-                throw e
+                // Deliberately not rethrown: every caller is fire-and-forget, and
+                // an escaping exception from a launched coroutine reaches the
+                // thread’s uncaught handler and takes the process down. Losing
+                // statistics is never worth killing the VPN over
+                Log.w(TAG, "Failed to write statistics, keeping the counts pending", e)
             }
         }
     }
