@@ -23,7 +23,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Dns
@@ -674,26 +673,6 @@ class ExternalBlocklistManager(private val context: Context) {
         return source.readString(Charsets.UTF_8)
     }
 
-    private fun calculateMetadata(groups: Map<String, BlocklistGroup>): BlocklistMetadata {
-        var tlds = 0
-        var domains = 0
-        var urls = 0
-
-        groups.values.forEach { group ->
-            tlds += group.tlds.size
-            domains += group.domains.size
-            urls += group.urls.size
-        }
-
-        return BlocklistMetadata(
-            totalRules = tlds + domains + urls,
-            tlds = tlds,
-            domains = domains,
-            urls = urls,
-            groups = groups.size
-        )
-    }
-
     private fun getIsoTimestamp(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -744,20 +723,6 @@ class ExternalBlocklistManager(private val context: Context) {
             }
         }
         migrateCacheFromPreferences(id)
-    }
-
-    /**
-     * Get all cached blocklist data for enabled configs.
-     */
-    suspend fun getAllCachedBlocklists(): Map<String, String> = withContext(Dispatchers.IO) {
-        val result = mutableMapOf<String, String>()
-        getConfigsSnapshot().filter { it.enabled }.forEach { config ->
-            val cached = getCachedBlocklist(config.id)
-            if (cached != null) {
-                result[config.id] = cached
-            }
-        }
-        result
     }
 
     /**

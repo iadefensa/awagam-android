@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import com.awagam.android.di.DependencyContainer
-import com.awagam.android.statistics.StatisticsManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay

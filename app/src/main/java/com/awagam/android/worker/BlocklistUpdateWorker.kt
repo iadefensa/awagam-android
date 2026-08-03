@@ -60,14 +60,6 @@ class BlocklistUpdateWorker(
 
             Log.d(TAG, "Scheduled blocklist updates every $intervalHours hours")
         }
-
-        /**
-         * Cancel scheduled updates.
-         */
-        fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-            Log.d(TAG, "Canceled blocklist updates")
-        }
     }
 
     override suspend fun doWork(): Result {

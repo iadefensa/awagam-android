@@ -4,7 +4,6 @@
     <string name="vpn_notification_channel">VPN Status</string>
     <string name="vpn_notification_title">AWAGAM Active</string>
     <string name="vpn_notification_text">Blocking %1$d domains</string>
-    <string name="vpn_notification_disabled">Protection disabled</string>
     <string name="battery_optimization_title">Improve Reliability</string>
     <string name="battery_optimization_message">Android may stop DNS filtering in the background to save battery. To keep protection uninterrupted, select AWAGAM in the battery optimization settings and choose “Don’t optimize.”</string>
     <string name="battery_optimization_action">Open settings</string>

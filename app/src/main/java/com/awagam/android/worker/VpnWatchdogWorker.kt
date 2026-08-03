@@ -43,11 +43,6 @@ class VpnWatchdogWorker(
 
             Log.d(TAG, "Scheduled VPN watchdog every 15 minutes")
         }
-
-        fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-            Log.d(TAG, "Canceled VPN watchdog")
-        }
     }
 
     override suspend fun doWork(): Result {
