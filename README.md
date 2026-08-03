@@ -18,6 +18,8 @@ Visit IA Defensa for [general information about this app](https://iadefensa.com/
 
 Output: `app/build/outputs/apk/debug/awagam-*.apk`
 
+Debug builds are not minified and keep debug logging, so they don’t reflect what ships. Verify behavior against a release build before distributing.
+
 ### Tests
 
 ```shell
@@ -57,13 +59,25 @@ Output:
 * APK: `app/build/outputs/apk/release/awagam-*.apk`
 * AAB: `app/build/outputs/bundle/release/awagam-release.aab`
 
+Each release after the first needs `versionCode` incremented in `app/build.gradle.kts`; Android refuses to install a build whose `versionCode` is not higher than the installed one.
+
+### Running on a Device
+
+```shell
+./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/awagam-*.apk
+```
+
+`-r` replaces the installed app while preserving its configuration. Switching signing keys requires `adb uninstall com.awagam.android` first, as Android rejects an update signed with a different key. Expect to grant VPN consent again after reinstalling.
+
+The app ships with no blocking rules, so a fresh install blocks nothing until a blocklist is added under Settings. [The AWAGAM blocklists repository](https://github.com/j9t/awagam-blocklists) has ready-made lists for testing.
+
 ### Distribution
 
 | Platform | Format | Notes |
 | --- | --- | --- |
 | **Play Store** | AAB | Upload the `.aab` file |
 | **Direct** | APK | Distribute the signed `.apk` file |
-| **F-Droid** | APK | Built from source by F-Droid; metadata in `fastlane/` |
+| **F-Droid** | APK | Built from source by F-Droid; listing metadata in `fastlane/` |
 
 The build is configured for reproducibility (`org.gradle.reproducibleFileOrder`, `org.gradle.reproducibleArchiveContents`, and `dependenciesInfo` omitted from APK and bundle). Release builds also strip debug logging via ProGuard, so no DNS query data reaches logcat—see [the privacy policy](PRIVACY.md).
 
