@@ -57,6 +57,8 @@ data class ExternalBlocklistConfig(
     val enabled: Boolean = true,
     val lastUpdated: String? = null,
     val lastAttempted: String? = null,
+    // Kept for import/export compatibility with the browser extension; refreshes
+    // are scheduled by `ExternalBlocklistManager.REFRESH_INTERVAL_MS` instead
     val updateInterval: Long = 86400000, // 24 hours in milliseconds
     val status: String = "pending",
     val errorMessage: String? = null,

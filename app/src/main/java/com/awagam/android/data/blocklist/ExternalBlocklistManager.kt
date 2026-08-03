@@ -52,6 +52,13 @@ class ExternalBlocklistManager(private val context: Context) {
         // Only read now, to migrate bodies stored by earlier versions
         private const val BLOCKLIST_CACHE_PREFIX = "blocklist_cache_"
         private const val CACHE_DIR_NAME = "blocklists"
+
+        // One cadence for every list. Configs carry their own `updateInterval`,
+        // but obeying it would let an imported third-party config decide how
+        // often this device fetches—silently, since nothing in the UI shows it,
+        // and in both directions: refetching at every wake, or never refreshing
+        // again. The field is still preserved on export
+        val REFRESH_INTERVAL_MS = TimeUnit.HOURS.toMillis(24)
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         // Bundle imports are fetched concurrently in batches within an overall
@@ -796,7 +803,9 @@ class ExternalBlocklistManager(private val context: Context) {
     }
 
     /**
-     * Check if a blocklist needs to be updated based on its update interval.
+     * Check whether a blocklist is due for a refresh.
+     * The cadence is [REFRESH_INTERVAL_MS] for every list, never the config’s own
+     * `updateInterval`—see the constant for why.
      */
     fun needsUpdate(config: ExternalBlocklistConfig): Boolean {
         val lastUpdated = config.lastUpdated ?: return true
@@ -806,14 +815,14 @@ class ExternalBlocklistManager(private val context: Context) {
             sdf.timeZone = TimeZone.getTimeZone("UTC")
             val lastUpdateTime = sdf.parse(lastUpdated)?.time ?: return true
             val now = System.currentTimeMillis()
-            (now - lastUpdateTime) >= config.updateInterval
+            (now - lastUpdateTime) >= REFRESH_INTERVAL_MS
         } catch (e: Exception) {
             true // If we can't parse the date, assume update is needed
         }
     }
 
     /**
-     * Refresh blocklists that need updating based on their update interval.
+     * Refresh the blocklists that are due.
      */
     suspend fun refreshBlocklistsIfNeeded() {
         refreshBlocklists { needsUpdate(it) }

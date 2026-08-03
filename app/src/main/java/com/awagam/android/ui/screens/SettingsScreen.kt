@@ -68,11 +68,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
+import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import com.awagam.android.ui.theme.Warning
 import com.awagam.android.ui.viewmodel.SettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -339,6 +342,14 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "All blocklists are refreshed every " +
+                        "${TimeUnit.MILLISECONDS.toHours(ExternalBlocklistManager.REFRESH_INTERVAL_MS)} hours, " +
+                        "and immediately when you add one or change its URL.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             if (uiState.blocklists.isEmpty()) {
@@ -436,6 +447,24 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Render the stored UTC timestamp in local time, so a list that silently stopped
+ * refreshing is visible rather than a matter of trust.
+ */
+private fun formatLastUpdated(lastUpdated: String?): String {
+    if (lastUpdated == null) return "Never refreshed"
+
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val date = parser.parse(lastUpdated) ?: return "Last refresh unknown"
+        "Refreshed ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(date)}"
+    } catch (e: Exception) {
+        "Last refresh unknown"
+    }
+}
+
 @Composable
 private fun BlocklistCard(
     blocklist: ExternalBlocklistConfig,
@@ -473,6 +502,11 @@ private fun BlocklistCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
+                    )
+                    Text(
+                        text = formatLastUpdated(blocklist.lastUpdated),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Switch(
