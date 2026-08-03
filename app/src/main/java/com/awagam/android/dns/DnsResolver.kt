@@ -448,7 +448,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
      * client or cached, and cache it when it is worth caching.
      * Returns the response to send back, or null to fail the query.
      */
-    private fun acceptUpstreamResponse(query: Message, response: ByteArray): ByteArray? {
+    internal fun acceptUpstreamResponse(query: Message, response: ByteArray): ByteArray? {
         val responseMessage = try {
             Message(response)
         } catch (e: Exception) {
