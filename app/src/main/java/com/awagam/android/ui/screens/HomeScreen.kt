@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -172,11 +173,15 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
+            // Card, title, and switch move together; the wording carries the
+            // difference between a start in progress and a confirmed one
+            val isActive = uiState.isEnabled || uiState.isStarting
+
             // Main toggle card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.isEnabled) {
+                    containerColor = if (isActive) {
                         MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
@@ -192,10 +197,14 @@ fun HomeScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (uiState.isEnabled) "Protection Active" else "Protection Off",
+                            text = when {
+                                uiState.isEnabled -> "Protection Active"
+                                uiState.isStarting -> "Starting Protection"
+                                else -> "Protection Off"
+                            },
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (uiState.isEnabled) {
+                            color = if (isActive) {
                                 MaterialTheme.colorScheme.tertiary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -205,6 +214,8 @@ fun HomeScreen(
                         Text(
                             text = if (uiState.isEnabled) {
                                 "DNS filtering is enabled"
+                            } else if (uiState.isStarting) {
+                                "Waiting for the VPN tunnel…"
                             } else if (uiState.isTemporarilyDisabled) {
                                 "Temporarily disabled"
                             } else {
@@ -215,12 +226,26 @@ fun HomeScreen(
                         )
                     }
 
+                    // Same pending affordance as the blocklist refresh button.
+                    // Unlike that one the control stays enabled: A toggle that
+                    // can’t be tapped is the very problem this state exists for.
+                    if (uiState.isStarting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(16.dp).height(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
                     Switch(
-                        checked = uiState.isEnabled,
+                        checked = isActive,
                         onCheckedChange = { enabled ->
-                            // Only set `enabled=false` immediately (for disabling)
-                            // For enabling, let the VPN service set the state after success
-                            if (!enabled) {
+                            // The switch follows the preference the VPN service writes,
+                            // so enabling only shows a pending state here; the service
+                            // confirms it, and `startRequested` gives up if it doesn’t
+                            if (enabled) {
+                                viewModel.startRequested()
+                            } else {
                                 viewModel.setEnabled(false)
                             }
                             onToggleVpn(enabled)
@@ -267,6 +292,7 @@ fun HomeScreen(
                     seconds = uiState.disableCountdownSeconds,
                     onCancel = {
                         viewModel.cancelTemporaryDisable()
+                        viewModel.startRequested()
                         onToggleVpn(true)
                     }
                 )
@@ -602,6 +628,10 @@ private fun VpnErrorCard(
     val errorMessage = when {
         error == UserPreferences.VPN_ERROR_ANOTHER_VPN ->
             "Could not start protection. Another VPN appears to be active. Android only allows one VPN at a time."
+        error == UserPreferences.VPN_ERROR_PERMISSION_DENIED ->
+            "Android did not grant the VPN connection. If another VPN app is set as always-on, turn that off in your VPN settings, then try again."
+        error == UserPreferences.VPN_ERROR_START_TIMEOUT ->
+            "Protection did not start in time. Another VPN may be holding the connection, or the blocklists may be too large to load. Try again."
         isDoHError -> {
             val detail = error.removePrefix("${UserPreferences.VPN_ERROR_DOH_FAILED}:")
             "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection or try a different DNS provider in your system settings."

@@ -64,6 +64,9 @@ class AWAGAMVpnService : VpnService() {
         @Volatile
         var pendingStop = false
             private set
+
+        // For work that has to finish after the service is destroyed
+        private val shutdownScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -109,6 +112,16 @@ class AWAGAMVpnService : VpnService() {
     private fun startVpn() {
         if (isRunning) {
             Log.d(TAG, "VPN already running")
+            // A live tunnel with the preference still off leaves the toggle stuck:
+            // Every tap lands here and returns, so nothing ever writes the
+            // preference the switch reads. Re-assert it instead of returning silently
+            if (vpnInterface != null) {
+                pendingStop = false
+                serviceScope.launch {
+                    userPreferences.setEnabled(true)
+                    userPreferences.clearVpnError()
+                }
+            }
             return
         }
 
@@ -166,24 +179,60 @@ class AWAGAMVpnService : VpnService() {
                         }
                     }
                 } else {
-                    isRunning = false
                     Log.e(TAG, "Failed to establish VPN interface (another VPN may be active)")
-                    userPreferences.setVpnError(UserPreferences.VPN_ERROR_ANOTHER_VPN)
-                    userPreferences.setEnabled(false)
-                    stopSelf()
+                    failStartup(UserPreferences.VPN_ERROR_ANOTHER_VPN)
                 }
             } catch (e: CancellationException) {
                 isRunning = false
                 Log.d(TAG, "VPN startup canceled")
+                // `stopVpn()` closes `vpnInterface`, but a cancellation landing
+                // between the assignment above and the preference write finds it
+                // still null there—close it here so no tunnel outlives the stop
+                try {
+                    vpnInterface?.close()
+                } catch (closeError: Exception) {
+                    Log.e(TAG, "Failed to close VPN interface", closeError)
+                }
+                vpnInterface = null
                 throw e
-            } catch (e: Exception) {
-                isRunning = false
+            } catch (e: Throwable) {
+                // `Throwable`, not `Exception`: an `Error` (out of memory while
+                // parsing a large blocklist, say) would otherwise leave
+                // `isRunning` true, and every later start request would
+                // short-circuit on it—the toggle would never move again
                 Log.e(TAG, "Failed to start VPN", e)
-                userPreferences.setVpnError(UserPreferences.VPN_ERROR_GENERAL)
-                userPreferences.setEnabled(false)
-                stopSelf()
+                failStartup(UserPreferences.VPN_ERROR_GENERAL)
             }
         }
+    }
+
+    /**
+     * Report a failed start and tear down.
+     * The preference writes are guarded because failing to persist them must not
+     * skip the teardown: that would strand an open tunnel behind a UI that says
+     * protection is off, with no way to recover from the toggle.
+     */
+    private suspend fun failStartup(error: String) {
+        isRunning = false
+        isServiceRunning = false
+
+        try {
+            withContext(NonCancellable) {
+                userPreferences.setVpnError(error)
+                userPreferences.setEnabled(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to persist VPN error state", e)
+        }
+
+        try {
+            vpnInterface?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to close VPN interface", e)
+        }
+        vpnInterface = null
+
+        stopSelf()
     }
 
     private fun establishVpn(): ParcelFileDescriptor? {
@@ -366,9 +415,11 @@ class AWAGAMVpnService : VpnService() {
         // which deadlocks with concurrent DataStore edits from the ViewModel
         // (DataStore dispatches transforms via `withContext(callerContext)` and the
         // ViewModel’s `callerContext` is `Dispatchers.Main`).
-        // `NonCancellable` ensures the write completes even when `serviceScope` is
-        // canceled during `onDestroy()`.
-        serviceScope.launch {
+        // The scope outlives the service instance: `stopSelf()` below triggers
+        // `onDestroy()`, and a coroutine launched on `serviceScope` that has not
+        // started yet when that cancels it never runs its body at all—`pendingStop`
+        // would stay set for the process lifetime, blocking every later restart.
+        shutdownScope.launch {
             withContext(NonCancellable) {
                 userPreferences.setEnabled(false)
                 pendingStop = false

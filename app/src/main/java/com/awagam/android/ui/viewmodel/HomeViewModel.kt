@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val isEnabled: Boolean = false,
+    val isStarting: Boolean = false,
     val tldCount: Int = 0,
     val domainCount: Int = 0,
     val blockedCount: Long = 0,
@@ -37,6 +38,12 @@ data class HomeUiState(
  */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        // How long a start may take—permission dialog, blocklist load, and tunnel
+        // setup—before the toggle gives up and says so
+        private const val START_TIMEOUT_MS = 20_000L
+    }
+
     private val userPreferences = UserPreferences(application)
     private val blocklistRepository = DependencyContainer.getBlocklistRepository()
     private val externalBlocklistManager = ExternalBlocklistManager(application)
@@ -50,11 +57,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val restartVpnEvent = _restartVpnEvent.receiveAsFlow()
 
     private var countdownJob: Job? = null
+    private var startTimeoutJob: Job? = null
 
     init {
         viewModelScope.launch {
             userPreferences.isEnabledFlow.collect { enabled ->
-                _uiState.update { it.copy(isEnabled = enabled) }
+                if (enabled) {
+                    startTimeoutJob?.cancel()
+                    startTimeoutJob = null
+                }
+                _uiState.update { it.copy(isEnabled = enabled, isStarting = it.isStarting && !enabled) }
             }
         }
 
@@ -77,7 +89,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             userPreferences.vpnErrorFlow.collect { error ->
-                _uiState.update { it.copy(vpnError = error) }
+                // A DoH error comes from a tunnel that did start; anything else
+                // means the start itself failed
+                val startFailed = error != null &&
+                    !error.startsWith(UserPreferences.VPN_ERROR_DOH_FAILED)
+                if (startFailed) {
+                    startTimeoutJob?.cancel()
+                    startTimeoutJob = null
+                }
+                _uiState.update {
+                    it.copy(vpnError = error, isStarting = it.isStarting && !startFailed)
+                }
             }
         }
 
@@ -136,8 +158,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update {
                     it.copy(isTemporarilyDisabled = false, disableCountdownSeconds = 0, vpnError = null)
                 }
+            } else {
+                startTimeoutJob?.cancel()
+                startTimeoutJob = null
+                _uiState.update { it.copy(isStarting = false) }
             }
             userPreferences.setEnabled(enabled)
+        }
+    }
+
+    /**
+     * Reflect a start request in the UI right away and put a deadline on it.
+     * The switch follows the preference the VPN service writes once the tunnel is
+     * up, so without this it stays off for the whole permission-and-startup
+     * sequence—and, if any step of that fails silently, for good.
+     */
+    fun startRequested() {
+        _uiState.update { it.copy(isStarting = true, vpnError = null) }
+        startTimeoutJob?.cancel()
+        startTimeoutJob = viewModelScope.launch {
+            userPreferences.clearVpnError()
+            delay(START_TIMEOUT_MS)
+            if (!_uiState.value.isEnabled) {
+                _uiState.update { it.copy(isStarting = false) }
+                userPreferences.setVpnError(UserPreferences.VPN_ERROR_START_TIMEOUT)
+            }
+            startTimeoutJob = null
         }
     }
 

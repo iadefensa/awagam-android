@@ -37,6 +37,8 @@ class UserPreferences(private val context: Context) {
         const val VPN_ERROR_ANOTHER_VPN = "another_vpn_active"
         const val VPN_ERROR_DOH_FAILED = "doh_failed"
         const val VPN_ERROR_GENERAL = "general_error"
+        const val VPN_ERROR_PERMISSION_DENIED = "permission_denied"
+        const val VPN_ERROR_START_TIMEOUT = "start_timeout"
     }
 
     val isEnabledFlow: Flow<Boolean> = context.dataStore.data

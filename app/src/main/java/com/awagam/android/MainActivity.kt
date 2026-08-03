@@ -44,6 +44,10 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             startVpnService()
+        } else {
+            lifecycleScope.launch {
+                userPreferences.setVpnError(UserPreferences.VPN_ERROR_PERMISSION_DENIED)
+            }
         }
     }
 
@@ -101,6 +105,8 @@ class MainActivity : ComponentActivity() {
             val isEnabled = userPreferences.isEnabledFlow.first()
             if (isEnabled && !AWAGAMVpnService.isServiceRunning && !AWAGAMVpnService.pendingStop) {
                 startVpnService()
+            } else if (!isEnabled && AWAGAMVpnService.isServiceRunning && !AWAGAMVpnService.pendingStop) {
+                userPreferences.setEnabled(true)
             }
         }
     }
