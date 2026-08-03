@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android
 
 import com.awagam.android.data.blocklist.BlocklistGroup
@@ -235,7 +237,7 @@ class ExternalBlocklistManagerTest {
         assertEquals(2, resolved.metadata.importsLoaded)
         assertEquals(setOf("import1_ads", "import3_ads"), resolved.groups.keys.toSet())
         assertTrue(resolved.warning!!.startsWith("1 of 3 imports skipped"))
-        assertTrue(resolved.warning!!.contains("dead.json"))
+        assertTrue(resolved.warning.contains("dead.json"))
     }
 
     @Test

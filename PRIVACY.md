@@ -1,6 +1,6 @@
 # AWAGAM Android Privacy Policy
 
-Last updated: Feb 16, 2026
+Last updated: August 3, 2026
 
 ## Summary
 
@@ -69,8 +69,8 @@ The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution. Their p
 
 ## Open Source
 
-This app is open source. You can verify these claims by reviewing the code [on GitHub](https://github.com/iadefensa/awagam-android).
+This app is free software, licensed under the GNU General Public License, version 3 or later. You can verify these claims by reviewing the code [on GitHub](https://github.com/iadefensa/awagam-android).
 
 ## Contact
 
-For questions, email info@meiert.com.
+For questions, email info@iadefensa.com.

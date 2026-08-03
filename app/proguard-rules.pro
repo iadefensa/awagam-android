@@ -1,5 +1,13 @@
 # AWAGAM Android ProGuard Rules
 
+# Strip debug logging from release builds; PRIVACY.md promises no DNS query logs,
+# and the resolver logs hostnames at these levels
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int i(...);
+    public static int v(...);
+}
+
 # Keep OkHttp3 classes (used for blocklist fetching)
 -dontwarn okhttp3.**
 -dontwarn okio.**
@@ -8,6 +16,13 @@
 
 # Keep dnsjava classes (reflection-heavy)
 -keep class org.xbill.DNS.** { *; }
+
+# dnsjava references desktop/Windows APIs that don’t exist on Android
+-dontwarn com.sun.jna.**
+-dontwarn java.lang.management.**
+-dontwarn javax.naming.**
+-dontwarn lombok.**
+-dontwarn sun.net.spi.nameservice.**
 
 # Keep Ktor classes
 -keep class io.ktor.** { *; }

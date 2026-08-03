@@ -10,7 +10,7 @@ plugins {
 // Set base archive name for AAB bundles
 base.archivesName.set("awagam")
 
-val appVersionName = "1.0.0-beta"
+val appVersionName = "1.0.0"
 
 // Load keystore properties if available
 val keystorePropertiesFile = rootProject.file("keystore.properties")

@@ -1,10 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.awagam.android
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +46,13 @@ class MainActivity : ComponentActivity() {
             startVpnService()
         }
     }
+
+    // Without this, the ongoing VPN notification—the app’s only status indicator
+    // outside the app—never reaches the shade on Android 13+, and background
+    // blocklist failure alerts are dropped silently
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Protection works either way; the notification is informational */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,7 +105,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Ask for notification access the first time the user turns protection on,
+     * so the request has visible context rather than firing at cold start.
+     */
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED
+        ) return
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     private fun requestVpnPermission() {
+        ensureNotificationPermission()
+
         // Have Android’s VPN framework handle conflicts:
         // If another VPN is active, `prepare()` shows a system dialog letting the user choose to switch;
         // if our own stale tunnel persists, `establish()` in the service will replace it
