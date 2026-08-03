@@ -75,6 +75,9 @@ object DependencyContainer {
      * Clear all dependencies (for testing).
      */
     fun clear() {
+        // Stop the statistics flush loop before dropping the instance, so a
+        // discarded manager can’t write after its replacement has taken over
+        statisticsManager?.close()
         blocklistRepository = null
         userPreferences = null
         dnsResolver = null

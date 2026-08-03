@@ -13,10 +13,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -195,12 +197,24 @@ class StatisticsManager(private val context: Context) {
         synchronized(this) {
             if (flushJob != null) return
             flushJob = scope.launch {
-                delay(FLUSH_INTERVAL_MS)
-                flushJob = null
-                flush()
+                try {
+                    delay(FLUSH_INTERVAL_MS)
+                    flush()
+                } finally {
+                    // Held until the write is done, so queries arriving during it
+                    // batch into the next flush instead of starting another one
+                    synchronized(this@StatisticsManager) { flushJob = null }
+                    // Those queries would otherwise wait for the next one to be
+                    // recorded, which on a quiet device can be a long time
+                    if (scope.isActive && hasPendingCounts()) scheduleFlush()
+                }
             }
         }
     }
+
+    private fun hasPendingCounts(): Boolean =
+        pendingQueries.get() > 0 || pendingBlocked.get() > 0 || pendingCacheHits.get() > 0 ||
+            pendingCacheMisses.get() > 0 || pendingBytes.get() > 0
 
     /**
      * Write the pending counts to disk. Called periodically while queries come
@@ -250,6 +264,18 @@ class StatisticsManager(private val context: Context) {
      */
     fun flushNow() {
         scope.launch { flush() }
+    }
+
+    /**
+     * Stop the periodic flushing and abandon whatever hasn’t been written yet.
+     * The manager is an application-lifetime singleton in production; this is
+     * for tests and for anything else that replaces the instance, so a pending
+     * flush from a discarded manager can’t write during someone else’s work.
+     * Call [flush] first if the counts still matter.
+     */
+    fun close() {
+        scope.cancel()
+        synchronized(this) { flushJob = null }
     }
 
     /**

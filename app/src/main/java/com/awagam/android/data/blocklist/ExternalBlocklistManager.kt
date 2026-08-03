@@ -33,6 +33,7 @@ import okhttp3.ResponseBody
 import java.io.File
 import java.net.InetAddress
 import java.net.UnknownHostException
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -766,13 +767,20 @@ class ExternalBlocklistManager(private val context: Context) {
      * megabytes for something as small as toggling one list on or off.
      *
      * IDs come from imported configs and are not trustworthy as file names, so
-     * the name is sanitized and disambiguated with a hash of the original.
+     * the name is sanitized and disambiguated with a digest of the original.
+     * The digest is a cryptographic one because sanitizing is lossy: two IDs
+     * that differ only in stripped characters must not share a file, and
+     * `hashCode` collisions are easy enough to construct for an imported
+     * config to overwrite another list’s rules.
      */
     private fun cacheFile(id: String): File {
         val dir = File(context.filesDir, CACHE_DIR_NAME)
         val safeId = id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(64)
-        val hash = Integer.toHexString(id.hashCode())
-        return File(dir, "$safeId-$hash.json")
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(id.toByteArray(Charsets.UTF_8))
+            .take(8)
+            .joinToString("") { "%02x".format(it) }
+        return File(dir, "$safeId-$digest.json")
     }
 
     /**
