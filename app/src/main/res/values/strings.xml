@@ -7,10 +7,10 @@
     <string name="vpn_notification_disabled">Protection disabled</string>
     <string name="battery_optimization_title">Improve Reliability</string>
     <string name="battery_optimization_message">Android may stop DNS filtering in the background to save battery. To keep protection uninterrupted, select AWAGAM in the battery optimization settings and choose “Don’t optimize.”</string>
-    <string name="battery_optimization_action">Open Settings</string>
+    <string name="battery_optimization_action">Open settings</string>
     <string name="blocklist_error_channel_name">Blocklist Errors</string>
     <string name="blocklist_error_channel_description">Alerts when a background blocklist update fails</string>
-    <string name="blocklist_update_failed_title">Blocklist update failed</string>
+    <string name="blocklist_update_failed_title">Blocklist Update Failed</string>
     <plurals name="blocklist_update_failed_text">
         <item quantity="one">1 blocklist could not be refreshed. Tap to review.</item>
         <item quantity="other">%d blocklists could not be refreshed. Tap to review.</item>
