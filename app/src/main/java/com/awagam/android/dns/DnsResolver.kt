@@ -453,7 +453,13 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    response.body.bytes()
+                    // A zero-length body would otherwise be wrapped into an empty
+                    // DNS packet; treat it as a failure so the caller returns SERVFAIL
+                    response.body.bytes().takeIf { it.isNotEmpty() }
+                        ?: run {
+                            Log.w(TAG, "DoH returned an empty body")
+                            null
+                        }
                 } else {
                     Log.w(TAG, "DoH request failed: ${response.code}")
                     null
