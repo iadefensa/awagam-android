@@ -107,6 +107,9 @@ class MainActivity : ComponentActivity() {
                 startVpnService()
             } else if (!isEnabled && AWAGAMVpnService.isServiceRunning && !AWAGAMVpnService.pendingStop) {
                 userPreferences.setEnabled(true)
+                // A “failed to start” banner left over from the attempt that
+                // preceded this tunnel would contradict what is now running
+                userPreferences.clearVpnError()
             }
         }
     }

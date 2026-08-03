@@ -37,8 +37,9 @@ class BlocklistUpdateWorker(
         private const val WORK_NAME = "blocklist_update"
 
         /**
-         * Schedule periodic blocklist updates.
-         * Default: every 6 hours when connected to network.
+         * Schedule periodic blocklist update checks.
+         * Default: every 6 hours when connected to network; which lists actually
+         * refresh is decided per list by their update interval.
          */
         fun schedule(context: Context, intervalHours: Long = 6) {
             val constraints = Constraints.Builder()
@@ -67,7 +68,10 @@ class BlocklistUpdateWorker(
 
         return try {
             val manager = ExternalBlocklistManager(applicationContext)
-            manager.refreshAllBlocklists()
+            // Each list declares its own update interval (24 hours by default),
+            // so the 6-hourly wake keeps short-interval lists fresh without
+            // refetching multi-megabyte lists that haven’t changed
+            manager.refreshBlocklistsIfNeeded()
 
             // Only actual failures—“warning” also carries an `errorMessage` (a
             // bundle’s skipped imports), but that refresh succeeded

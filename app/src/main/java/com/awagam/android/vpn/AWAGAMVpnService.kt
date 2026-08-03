@@ -195,11 +195,16 @@ class AWAGAMVpnService : VpnService() {
                 }
                 vpnInterface = null
                 throw e
-            } catch (e: Throwable) {
-                // `Throwable`, not `Exception`: an `Error` (out of memory while
-                // parsing a large blocklist, say) would otherwise leave
-                // `isRunning` true, and every later start request would
-                // short-circuit on it—the toggle would never move again
+            } catch (e: Error) {
+                // An `Error` (out of memory while parsing a large blocklist, say)
+                // leaves the process in an undefined state, so it is not handled
+                // here—but the flags are reset first, since a crash that left
+                // `isRunning` true would make every later start short-circuit
+                isRunning = false
+                isServiceRunning = false
+                Log.e(TAG, "Fatal error starting VPN", e)
+                throw e
+            } catch (e: Exception) {
                 Log.e(TAG, "Failed to start VPN", e)
                 failStartup(UserPreferences.VPN_ERROR_GENERAL)
             }
@@ -421,10 +426,17 @@ class AWAGAMVpnService : VpnService() {
         // would stay set for the process lifetime, blocking every later restart.
         shutdownScope.launch {
             withContext(NonCancellable) {
-                userPreferences.setEnabled(false)
-                pendingStop = false
-                // Persist the queries recorded since the last periodic flush
-                statisticsManager.flush()
+                try {
+                    userPreferences.setEnabled(false)
+                    // Persist the queries recorded since the last periodic flush
+                    statisticsManager.flush()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to persist state on stop", e)
+                } finally {
+                    // In `finally` so a failed write can’t leave the flag set for
+                    // the process lifetime, which would block every later restart
+                    pendingStop = false
+                }
             }
         }
 

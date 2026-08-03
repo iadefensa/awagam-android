@@ -11,6 +11,7 @@ import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -36,7 +37,8 @@ data class SettingsUiState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
-    val exportContent: String? = null
+    val exportContent: String? = null,
+    val autoStart: Boolean = false
 )
 
 /**
@@ -47,6 +49,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val blocklistManager = ExternalBlocklistManager(application)
     private val blocklistRepository = DependencyContainer.getBlocklistRepository()
+    private val userPreferences = UserPreferences(application)
     private val exporter = BlocklistExporter(application)
     private val json = Json { prettyPrint = true }
 
@@ -72,6 +75,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
             }
+        }
+
+        viewModelScope.launch {
+            userPreferences.autoStartFlow.collect { autoStart ->
+                _uiState.update { it.copy(autoStart = autoStart) }
+            }
+        }
+    }
+
+    fun setAutoStart(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setAutoStart(enabled)
         }
     }
 

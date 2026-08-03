@@ -2,6 +2,7 @@
 
 package com.awagam.android.ui.screens
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -86,6 +87,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
+    // Remembered so the export dialog can share the same format it is showing
+    var exportFormat by remember { mutableStateOf<BlocklistExporter.Format?>(null) }
     var editingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -125,6 +128,15 @@ fun SettingsScreen(
                     snackbarHostState.showSnackbar("Failed to save file: ${e.message}")
                 }
             }
+        }
+    }
+
+    // Hand the generated export file to the system share sheet
+    val shareIntent by viewModel.shareIntent.collectAsState()
+    LaunchedEffect(shareIntent) {
+        shareIntent?.let { intent ->
+            context.startActivity(Intent.createChooser(intent, "Share blocklist"))
+            viewModel.clearShareIntent()
         }
     }
 
@@ -283,6 +295,43 @@ fun SettingsScreen(
                 }
             }
 
+            // Start on boot
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Start on Boot",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Turn protection back on after the device restarts. Needs VPN permission to have been granted once.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = uiState.autoStart,
+                            onCheckedChange = { viewModel.setAutoStart(it) }
+                        )
+                    }
+                }
+            }
+
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -366,6 +415,7 @@ fun SettingsScreen(
         ExportFormatDialog(
             onDismiss = { showExportFormatDialog = false },
             onSelectFormat = { format ->
+                exportFormat = format
                 viewModel.generateExport(format)
                 showExportFormatDialog = false
             }
@@ -376,11 +426,12 @@ fun SettingsScreen(
     uiState.exportContent?.let { content ->
         ImportExportDialog(
             title = "Export for DNS Filtering",
-            description = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools:",
+            description = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools, or share it as a file:",
             isImport = false,
             onDismiss = { viewModel.clearExportContent() },
             onConfirm = { viewModel.clearExportContent() },
-            exportData = content
+            exportData = content,
+            onShare = exportFormat?.let { format -> { viewModel.shareExport(format) } }
         )
     }
 }
@@ -590,7 +641,8 @@ private fun ImportExportDialog(
     isImport: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
-    exportData: String?
+    exportData: String?,
+    onShare: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf(exportData ?: "") }
 
@@ -622,8 +674,15 @@ private fun ImportExportDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            Row {
+                onShare?.let { share ->
+                    TextButton(onClick = share) {
+                        Text("Share")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
             }
         }
     )
