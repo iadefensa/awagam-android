@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.first
@@ -54,6 +55,11 @@ class AWAGAMVpnService : VpnService() {
         // saturate the OkHttp dispatcher, slowing down every other query
         private const val MAX_CONCURRENT_QUERIES = 32
 
+        // The probe runs right after the tunnel comes up, when routing may still
+        // be settling, so a single failure says nothing; only a run of them does
+        private const val DOH_PROBE_ATTEMPTS = 3
+        private const val DOH_PROBE_RETRY_DELAY_MS = 2_000L
+
         // Check whether VPN service is actively running;
         // volatile for cross-thread visibility
         @Volatile
@@ -73,6 +79,11 @@ class AWAGAMVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var isRunning = false
 
+    // Set when the startup probe reported a DoH failure, so the first query that
+    // actually succeeds can retract a warning the user would otherwise be stuck with
+    @Volatile
+    private var dohErrorReported = false
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var startupJob: Job? = null
     private var processingJob: Job? = null
@@ -88,6 +99,20 @@ class AWAGAMVpnService : VpnService() {
         userPreferences = DependencyContainer.getUserPreferences()
         dnsResolver = DependencyContainer.getDnsResolver()
         statisticsManager = DependencyContainer.getStatisticsManager()
+    }
+
+    /**
+     * Probe the DoH upstream, retrying before it counts as unreachable.
+     * Returns the last error, or null as soon as one attempt gets through.
+     */
+    private suspend fun probeUpstream(): String? {
+        var lastError: String? = null
+        repeat(DOH_PROBE_ATTEMPTS) { attempt ->
+            if (attempt > 0) delay(DOH_PROBE_RETRY_DELAY_MS)
+            lastError = dnsResolver.testUpstreamConnectivity() ?: return null
+            Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $lastError")
+        }
+        return lastError
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -146,6 +171,16 @@ class AWAGAMVpnService : VpnService() {
                 // Set up protected socket factory so DoH requests bypass the VPN
                 dnsResolver.setProtectedSocketFactory(createProtectedSocketFactory())
 
+                // Live queries are the ground truth: One that gets through proves
+                // the upstream is reachable, whatever the startup probe concluded
+                dnsResolver.onUpstreamSuccess = {
+                    if (dohErrorReported) {
+                        dohErrorReported = false
+                        Log.d(TAG, "Upstream reachable again, clearing DoH warning")
+                        serviceScope.launch { userPreferences.clearVpnError() }
+                    }
+                }
+
                 // Start foreground service with notification
                 startForeground(AWAGAMApplication.NOTIFICATION_ID, createNotification())
 
@@ -171,9 +206,10 @@ class AWAGAMVpnService : VpnService() {
 
                     // Test DoH connectivity in the background and warn the user if it fails
                     launch(Dispatchers.IO) {
-                        val error = dnsResolver.testUpstreamConnectivity()
+                        val error = probeUpstream()
                         if (error != null) {
                             Log.e(TAG, "DoH connectivity test failed: $error")
+                            dohErrorReported = true
                             userPreferences.setVpnError(
                                 "${UserPreferences.VPN_ERROR_DOH_FAILED}:$error"
                             )
@@ -473,6 +509,9 @@ class AWAGAMVpnService : VpnService() {
     override fun onDestroy() {
         isRunning = false
         isServiceRunning = false
+        // The resolver outlives this service, so drop the callback holding it
+        dnsResolver.onUpstreamSuccess = null
+        dohErrorReported = false
         statisticsManager.flushNow()
         vpnInterface?.close()
         vpnInterface = null

@@ -398,7 +398,9 @@ fun SettingsScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                // Clears the FAB: 56 dp tall, sitting 16 dp up, against the
+                // list’s own 16 dp bottom padding
+                Spacer(modifier = Modifier.height(56.dp))
             }
         }
     }
@@ -464,9 +466,11 @@ private fun formatLastUpdated(lastUpdated: String?): String {
             timeZone = TimeZone.getTimeZone("UTC")
         }
         val date = parser.parse(lastUpdated) ?: return "Last refresh unknown"
-        // Locale-aware, so date order and 12/24-hour clock follow the device
-        val formatter = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-        "Refreshed ${formatter.format(date)}"
+        // Locale-aware parts, joined here so the comma after the year does not
+        // depend on the platform’s date-time pattern
+        val day = DateFormat.getDateInstance(DateFormat.MEDIUM).format(date)
+        val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date)
+        "Refreshed $day, $time"
     } catch (e: Exception) {
         "Last refresh unknown"
     }
@@ -504,7 +508,7 @@ private fun BlocklistCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (blocklist.enabled) {
-                MaterialTheme.colorScheme.surface
+                MaterialTheme.colorScheme.surfaceVariant
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             }
