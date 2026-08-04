@@ -39,8 +39,8 @@ class BlocklistUpdateWorker(
 
         /**
          * Schedule periodic blocklist update checks.
-         * Default: every 6 hours when connected to network; which lists actually
-         * refresh is decided per list by their update interval.
+         * Default: Every 6 hours when connected to network; a check only refetches
+         * the lists whose last refresh is older than `BLOCKLIST_REFRESH_INTERVAL_MS`.
          */
         fun schedule(context: Context, intervalHours: Long = 6) {
             val constraints = Constraints.Builder()
@@ -69,9 +69,9 @@ class BlocklistUpdateWorker(
 
         return try {
             val manager = ExternalBlocklistManager(applicationContext)
-            // Each list declares its own update interval (24 hours by default),
-            // so the 6-hourly wake keeps short-interval lists fresh without
-            // refetching multi-megabyte lists that haven’t changed
+            // Every list refreshes on the same cadence (24 hours), so the more
+            // frequent wake only narrows how long a due list stays stale—it
+            // never refetches multi-megabyte lists ahead of that cadence
             manager.refreshBlocklistsIfNeeded()
 
             // Only actual failures—“warning” also carries an `errorMessage` (a
