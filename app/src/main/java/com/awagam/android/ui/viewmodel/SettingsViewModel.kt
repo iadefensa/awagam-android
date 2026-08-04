@@ -51,7 +51,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val blocklistRepository = DependencyContainer.getBlocklistRepository()
     private val userPreferences = UserPreferences(application)
     private val exporter = BlocklistExporter(application)
-    private val json = Json { prettyPrint = true }
+    // `encodeDefaults` so the export states every field explicitly, including
+    // `updateInterval`: The browser extension honors per-list intervals and
+    // substitutes its own 6-hour default for a missing one, which would refresh
+    // imported lists four times as often as this app says it does
+    private val json = Json {
+        prettyPrint = true
+        encodeDefaults = true
+    }
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()

@@ -66,9 +66,9 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
-import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import com.awagam.android.ui.theme.Warning
 import com.awagam.android.ui.viewmodel.SettingsViewModel
 import java.text.SimpleDateFormat
@@ -345,7 +345,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "All blocklists are refreshed every " +
-                        "${TimeUnit.MILLISECONDS.toHours(ExternalBlocklistManager.REFRESH_INTERVAL_MS)} hours, " +
+                        "${TimeUnit.MILLISECONDS.toHours(BLOCKLIST_REFRESH_INTERVAL_MS)} hours, " +
                         "and immediately when you add one or change its URL.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
