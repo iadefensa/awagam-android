@@ -365,7 +365,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         val blocklistWarningText = buildAnnotatedString {
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
-                                append("Add blocklists containing TLDs or domains to start filtering. Use your own and ")
+                                append("Add blocklists containing TLDs or domains to start filtering. Use your own or ")
                             }
                             withLink(LinkAnnotation.Url(
                                 url = "https://iadefensa.com/solutions/awagam-chromium/#blocklists"
