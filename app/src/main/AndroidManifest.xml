@@ -54,7 +54,11 @@
                 android:value="DNS filtering for content blocking" />
         </service>
 
-        <!-- Boot receiver for auto-start -->
+        <!-- Boot receiver for auto-start. Exported because BOOT_COMPLETED is sent
+             by the system, not by this app, and a non-exported receiver rejects
+             every sender outside its own UID; other apps cannot spoof it, as
+             BOOT_COMPLETED is a protected broadcast the framework only lets the
+             system send. -->
         <receiver
             android:name=".receiver.BootReceiver"
             android:exported="true">
