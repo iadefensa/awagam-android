@@ -534,8 +534,13 @@ private fun BlocklistCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
+                    // Parsing and formatting outlive a toggle or a refresh
+                    // changing some other field of the same card
+                    val lastRefreshed = remember(blocklist.lastUpdated) {
+                        formatLastUpdated(blocklist.lastUpdated)
+                    }
                     Text(
-                        text = formatLastUpdated(blocklist.lastUpdated),
+                        text = lastRefreshed,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

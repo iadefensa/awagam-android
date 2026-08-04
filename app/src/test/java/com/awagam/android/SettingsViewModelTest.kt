@@ -4,6 +4,10 @@
 package com.awagam.android
 
 import android.app.Application
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.test.core.app.ApplicationProvider
 import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
@@ -12,10 +16,12 @@ import com.awagam.android.di.DependencyContainer
 import com.awagam.android.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,6 +42,12 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [34], application = Application::class)
 class SettingsViewModelTest {
 
+    private companion object {
+        // Only a backstop against a hang: The wait below ends as soon as the
+        // ViewModel has seen the stored list, not after a fixed delay
+        const val IO_TIMEOUT_MS = 10_000L
+    }
+
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var app: Application
 
@@ -54,18 +66,26 @@ class SettingsViewModelTest {
 
     // Helper Methods
 
-    /** Wait for DataStore IO operations to complete on real threads. */
-    private fun waitForIo() {
-        Thread.sleep(500)
-    }
-
-    /** Store a blocklist, then read the export the settings screen would show. */
+    /**
+     * Store a blocklist, then read the export the settings screen would show.
+     * The ViewModel goes through a store so clearing it cancels the collectors
+     * its `init` starts, which would otherwise outlive the test.
+     */
     private fun exportWith(config: ExternalBlocklistConfig): String {
         runBlocking { ExternalBlocklistManager(app).addBlocklist(config) }
-        waitForIo()
-        val viewModel = SettingsViewModel(app)
-        waitForIo()
-        return viewModel.uiState.value.exportJson
+
+        val store = ViewModelStore()
+        return try {
+            val factory = viewModelFactory { initializer { SettingsViewModel(app) } }
+            val viewModel = ViewModelProvider(store, factory)[SettingsViewModel::class.java]
+            runBlocking {
+                withTimeout(IO_TIMEOUT_MS) {
+                    viewModel.uiState.first { it.blocklists.isNotEmpty() }
+                }.exportJson
+            }
+        } finally {
+            store.clear()
+        }
     }
 
     private fun config(updateInterval: Long) = ExternalBlocklistConfig(
