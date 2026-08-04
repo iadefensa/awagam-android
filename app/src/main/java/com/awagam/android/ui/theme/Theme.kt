@@ -23,8 +23,12 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color(0xFF000000),          // Black text on primary
     secondary = Color(0xFF333333),          // Dark gray (matching web secondary)
     onSecondary = Color.White,               // White text on secondary
+    secondaryContainer = Color(0xFF333333), // Neutral card (countdown)
+    onSecondaryContainer = Color(0xFFFBFBFB), // Light text (contrast ≈ 12:1)
     tertiary = Color(0xFF15803D),           // Green-700 (contrast with white ≈ 5:1)
     onTertiary = Color.White,
+    tertiaryContainer = Color(0xFF14532D),  // Green-900 card (empty state, battery prompt)
+    onTertiaryContainer = Color(0xFFFBFBFB), // Light text (contrast ≈ 9:1)
     background = Color(0xFF18181B),         // Dark background (zinc-900)
     onBackground = Color(0xFFFBFBFB),       // Light text
     surface = Color(0xFF27272A),            // Slightly lighter surface (zinc-800)
@@ -32,7 +36,9 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = Color(0xFF3F3F46),     // For cards/containers (zinc-700)
     onSurfaceVariant = Color(0xFFB5B5B5),   // Muted text
     outline = Color(0xFF333333),            // Borders
-    error = Color(0xFFDC2626)               // Red (semantic: blocked/error)
+    error = Color(0xFFDC2626),              // Red (semantic: blocked/error)
+    errorContainer = Color(0xFF7F1D1D),     // Red-900 card (VPN errors)
+    onErrorContainer = Color(0xFFFBFBFB)    // Light text (contrast ≈ 9.5:1)
 )
 
 @Composable

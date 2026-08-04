@@ -306,7 +306,7 @@ fun SettingsScreen(
                     title = "Blocklists",
                     description = "All blocklists are refreshed every " +
                         "${TimeUnit.MILLISECONDS.toHours(BLOCKLIST_REFRESH_INTERVAL_MS)} hours, " +
-                        "and immediately when you add or edit one."
+                        "and immediately when you add one."
                 )
             }
 
