@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -68,6 +67,7 @@ import android.provider.Settings
 import java.text.NumberFormat
 import com.awagam.android.R
 import com.awagam.android.data.preferences.UserPreferences
+import com.awagam.android.ui.theme.protectionSwitchColors
 import com.awagam.android.ui.viewmodel.HomeViewModel
 
 /**
@@ -152,12 +152,12 @@ fun HomeScreen(
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.semantics {
-                            contentDescription = "Open blocklist settings"
+                            contentDescription = "Open settings"
                         }
                     ) {
                         Icon(
                             Icons.Filled.Settings,
-                            contentDescription = "Blocklist settings"
+                            contentDescription = "Settings"
                         )
                     }
                 }
@@ -251,12 +251,7 @@ fun HomeScreen(
                             }
                             onToggleVpn(enabled)
                         },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.tertiary,
-                            checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
-                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        colors = protectionSwitchColors()
                     )
                 }
             }

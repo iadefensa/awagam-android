@@ -71,6 +71,7 @@ import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.ui.theme.Warning
+import com.awagam.android.ui.theme.awagamSwitchColors
 import com.awagam.android.ui.viewmodel.SettingsViewModel
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -158,7 +159,7 @@ fun SettingsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Blocklists") },
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -300,57 +301,12 @@ fun SettingsScreen(
                 }
             }
 
-            // Start on boot
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Start on Boot",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Turn protection back on after the device restarts. Needs VPN permission to have been granted once.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Switch(
-                            checked = uiState.autoStart,
-                            onCheckedChange = { viewModel.setAutoStart(it) }
-                        )
-                    }
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Blocklists",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "All blocklists are refreshed every " +
+                SectionHeader(
+                    title = "Blocklists",
+                    description = "All blocklists are refreshed every " +
                         "${TimeUnit.MILLISECONDS.toHours(BLOCKLIST_REFRESH_INTERVAL_MS)} hours, " +
-                        "and immediately when you add one or change its URL.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "and immediately when you add or edit one."
                 )
             }
 
@@ -392,6 +348,42 @@ fun SettingsScreen(
                     onEdit = { editingBlocklist = blocklist },
                     onDelete = { viewModel.deleteBlocklist(blocklist.id) }
                 )
+            }
+
+            item {
+                SectionHeader(
+                    title = "Start on Boot",
+                    description = "Needs VPN permission to have been granted once."
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Turn protection back on after the device restarts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = uiState.autoStart,
+                            onCheckedChange = { viewModel.setAutoStart(it) },
+                            colors = awagamSwitchColors()
+                        )
+                    }
+                }
             }
 
             item {
@@ -469,6 +461,26 @@ private fun formatLastUpdated(lastUpdated: String?): String {
     }
 }
 
+/**
+ * Heading that opens a settings section, including the gap that separates it
+ * from the section before.
+ */
+@Composable
+private fun SectionHeader(title: String, description: String) {
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = description,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
 @Composable
 private fun BlocklistCard(
     blocklist: ExternalBlocklistConfig,
@@ -515,7 +527,8 @@ private fun BlocklistCard(
                 }
                 Switch(
                     checked = blocklist.enabled,
-                    onCheckedChange = { onToggle() }
+                    onCheckedChange = { onToggle() },
+                    colors = awagamSwitchColors()
                 )
             }
 
