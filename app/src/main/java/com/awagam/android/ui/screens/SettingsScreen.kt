@@ -72,6 +72,7 @@ import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.ui.theme.Warning
 import com.awagam.android.ui.viewmodel.SettingsViewModel
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -460,7 +461,9 @@ private fun formatLastUpdated(lastUpdated: String?): String {
             timeZone = TimeZone.getTimeZone("UTC")
         }
         val date = parser.parse(lastUpdated) ?: return "Last refresh unknown"
-        "Refreshed ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(date)}"
+        // Locale-aware, so date order and 12/24-hour clock follow the device
+        val formatter = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+        "Refreshed ${formatter.format(date)}"
     } catch (e: Exception) {
         "Last refresh unknown"
     }
