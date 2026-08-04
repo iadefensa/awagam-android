@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -57,6 +58,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -367,6 +371,13 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            // Pairs the label with the switch for TalkBack, and makes
+                            // the row the target rather than the switch alone
+                            .toggleable(
+                                value = uiState.autoStart,
+                                role = Role.Switch,
+                                onValueChange = { viewModel.setAutoStart(it) }
+                            )
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -379,7 +390,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Switch(
                             checked = uiState.autoStart,
-                            onCheckedChange = { viewModel.setAutoStart(it) },
+                            onCheckedChange = null,
                             colors = awagamSwitchColors()
                         )
                     }
@@ -525,10 +536,14 @@ private fun BlocklistCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // Named rather than made a row toggle: The card carries its own
+                // refresh, edit, and delete actions, so a row-wide target would
+                // fire on taps meant for those
                 Switch(
                     checked = blocklist.enabled,
                     onCheckedChange = { onToggle() },
-                    colors = awagamSwitchColors()
+                    colors = awagamSwitchColors(),
+                    modifier = Modifier.semantics { contentDescription = blocklist.name }
                 )
             }
 

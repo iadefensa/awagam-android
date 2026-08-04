@@ -17,6 +17,10 @@ import androidx.compose.ui.platform.LocalContext
 // Material 3 color schemes have no warning slot (contrast with surface ≈ 8:1)
 val Warning = Color(0xFFFBBF24)
 
+// Amber-900, the container step for `[Warning]`, matching how the green and red
+// containers pair with their foreground colors (contrast with light text ≈ 8.5:1)
+val WarningContainer = Color(0xFF78350F)
+
 // Shadcn-style neutral palette (matching extension design)
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFEBEBEB),            // Near-white (matching Basecoat primary)

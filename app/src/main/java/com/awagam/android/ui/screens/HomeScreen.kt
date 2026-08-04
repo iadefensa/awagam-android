@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.withLink
 import androidx.compose.foundation.verticalScroll
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
@@ -67,6 +69,7 @@ import android.provider.Settings
 import java.text.NumberFormat
 import com.awagam.android.R
 import com.awagam.android.data.preferences.UserPreferences
+import com.awagam.android.ui.theme.WarningContainer
 import com.awagam.android.ui.theme.protectionSwitchColors
 import com.awagam.android.ui.viewmodel.HomeViewModel
 
@@ -192,6 +195,23 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Makes the whole card the target the “Tap to enable” copy
+                        // promises, and pairs the label with the switch for TalkBack
+                        .toggleable(
+                            value = isActive,
+                            role = Role.Switch,
+                            onValueChange = { enabled ->
+                                // The switch follows the preference the VPN service writes,
+                                // so enabling only shows a pending state here; the service
+                                // confirms it, and `startRequested` gives up if it doesn’t
+                                if (enabled) {
+                                    viewModel.startRequested()
+                                } else {
+                                    viewModel.setEnabled(false)
+                                }
+                                onToggleVpn(enabled)
+                            }
+                        )
                         .padding(24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -238,19 +258,10 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
 
+                    // Toggled by the row, which owns the click and the semantics
                     Switch(
                         checked = isActive,
-                        onCheckedChange = { enabled ->
-                            // The switch follows the preference the VPN service writes,
-                            // so enabling only shows a pending state here; the service
-                            // confirms it, and `startRequested` gives up if it doesn’t
-                            if (enabled) {
-                                viewModel.startRequested()
-                            } else {
-                                viewModel.setEnabled(false)
-                            }
-                            onToggleVpn(enabled)
-                        },
+                        onCheckedChange = null,
                         colors = protectionSwitchColors()
                     )
                 }
@@ -341,7 +352,7 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        containerColor = WarningContainer
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -349,11 +360,11 @@ fun HomeScreen(
                             text = "No Blocking Rules Configured",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         val blocklistWarningText = buildAnnotatedString {
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onTertiaryContainer)) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
                                 append("Add blocklists containing TLDs or domains to start filtering. Use your own and ")
                             }
                             withLink(LinkAnnotation.Url(
@@ -366,7 +377,7 @@ fun HomeScreen(
                                     append("existing blocklists")
                                 }
                             }
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onTertiaryContainer)) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
                                 append(". URL-only blocklists are not supported at the DNS level.")
                             }
                         }
