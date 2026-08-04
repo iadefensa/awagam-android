@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.data.blocklist
@@ -9,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -40,9 +40,6 @@ class BlocklistRepository(private val context: Context) {
 
     private val _blocklistStats = MutableStateFlow(BlocklistStats())
     val blocklistStats: StateFlow<BlocklistStats> = _blocklistStats.asStateFlow()
-
-    private val _blockedCount = MutableStateFlow(0)
-    val blockedCount: StateFlow<Int> = _blockedCount.asStateFlow()
 
     /**
      * Load blocklists from the user’s configured sources.
@@ -122,19 +119,7 @@ class BlocklistRepository(private val context: Context) {
      * Check if a domain should be blocked.
      * Checks against both TLD and domain blocklists.
      */
-    fun isBlocked(hostname: String): Boolean {
-        if (!matcher.isBlocked(hostname)) return false
-        // Queries are resolved concurrently, so increment atomically
-        _blockedCount.update { it + 1 }
-        return true
-    }
-
-    /**
-     * Reset the blocked count (e.g., at start of day or on demand).
-     */
-    fun resetBlockedCount() {
-        _blockedCount.value = 0
-    }
+    fun isBlocked(hostname: String): Boolean = matcher.isBlocked(hostname)
 
     /**
      * Get all blocked TLDs for export.

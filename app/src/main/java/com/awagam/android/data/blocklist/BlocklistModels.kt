@@ -1,9 +1,19 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.data.blocklist
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import java.util.concurrent.TimeUnit
+
+/**
+ * How often blocklists are refreshed—one cadence for every list, rather than the
+ * per-list value an imported config carries, which nothing in the UI would show.
+ * Also the value exported to the browser extension, which does honor per-list
+ * intervals; keep it within the range that accepts (1 hour to 1 week).
+ */
+val BLOCKLIST_REFRESH_INTERVAL_MS: Long = TimeUnit.HOURS.toMillis(24)
 
 /**
  * Represents a group of blocked entries in the AWAGAM JSON format.
@@ -57,7 +67,9 @@ data class ExternalBlocklistConfig(
     val enabled: Boolean = true,
     val lastUpdated: String? = null,
     val lastAttempted: String? = null,
-    val updateInterval: Long = 86400000, // 24 hours in milliseconds
+    // An imported value is kept for export fidelity but not obeyed here; this
+    // app refreshes every list on `BLOCKLIST_REFRESH_INTERVAL_MS`
+    val updateInterval: Long = BLOCKLIST_REFRESH_INTERVAL_MS,
     val status: String = "pending",
     val errorMessage: String? = null,
     val metadata: BlocklistMetadata? = null

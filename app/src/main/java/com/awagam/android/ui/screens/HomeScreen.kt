@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.ui.screens
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.withLink
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -31,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -47,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
@@ -66,6 +69,8 @@ import android.provider.Settings
 import java.text.NumberFormat
 import com.awagam.android.R
 import com.awagam.android.data.preferences.UserPreferences
+import com.awagam.android.ui.theme.WarningContainer
+import com.awagam.android.ui.theme.protectionSwitchColors
 import com.awagam.android.ui.viewmodel.HomeViewModel
 
 /**
@@ -150,12 +155,12 @@ fun HomeScreen(
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.semantics {
-                            contentDescription = "Open blocklist settings"
+                            contentDescription = "Open settings"
                         }
                     ) {
                         Icon(
                             Icons.Filled.Settings,
-                            contentDescription = "Blocklist settings"
+                            contentDescription = "Settings"
                         )
                     }
                 }
@@ -172,11 +177,15 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(4.dp))
 
+            // Card, title, and switch move together; the wording carries the
+            // difference between a start in progress and a confirmed one
+            val isActive = uiState.isEnabled || uiState.isStarting
+
             // Main toggle card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.isEnabled) {
+                    containerColor = if (isActive) {
                         MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
@@ -186,16 +195,37 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Makes the whole card the target the “Tap to enable” copy
+                        // promises, and pairs the label with the switch for TalkBack
+                        .toggleable(
+                            value = isActive,
+                            role = Role.Switch,
+                            onValueChange = { enabled ->
+                                // The switch follows the preference the VPN service writes,
+                                // so enabling only shows a pending state here; the service
+                                // confirms it, and `startRequested` gives up if it doesn’t
+                                if (enabled) {
+                                    viewModel.startRequested()
+                                } else {
+                                    viewModel.setEnabled(false)
+                                }
+                                onToggleVpn(enabled)
+                            }
+                        )
                         .padding(24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (uiState.isEnabled) "Protection Active" else "Protection Off",
+                            text = when {
+                                uiState.isEnabled -> "Protection Active"
+                                uiState.isStarting -> "Starting Protection"
+                                else -> "Protection Off"
+                            },
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (uiState.isEnabled) {
+                            color = if (isActive) {
                                 MaterialTheme.colorScheme.tertiary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -205,6 +235,8 @@ fun HomeScreen(
                         Text(
                             text = if (uiState.isEnabled) {
                                 "DNS filtering is enabled"
+                            } else if (uiState.isStarting) {
+                                "Waiting for the VPN tunnel…"
                             } else if (uiState.isTemporarilyDisabled) {
                                 "Temporarily disabled"
                             } else {
@@ -215,22 +247,22 @@ fun HomeScreen(
                         )
                     }
 
-                    Switch(
-                        checked = uiState.isEnabled,
-                        onCheckedChange = { enabled ->
-                            // Only set `enabled=false` immediately (for disabling)
-                            // For enabling, let the VPN service set the state after success
-                            if (!enabled) {
-                                viewModel.setEnabled(false)
-                            }
-                            onToggleVpn(enabled)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.tertiary,
-                            checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f),
-                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    // Same pending affordance as the blocklist refresh button.
+                    // Unlike that one the control stays enabled: A toggle that
+                    // can’t be tapped is the very problem this state exists for.
+                    if (uiState.isStarting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(16.dp).height(16.dp),
+                            strokeWidth = 2.dp
                         )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
+                    // Toggled by the row, which owns the click and the semantics
+                    Switch(
+                        checked = isActive,
+                        onCheckedChange = null,
+                        colors = protectionSwitchColors()
                     )
                 }
             }
@@ -267,6 +299,7 @@ fun HomeScreen(
                     seconds = uiState.disableCountdownSeconds,
                     onCancel = {
                         viewModel.cancelTemporaryDisable()
+                        viewModel.startRequested()
                         onToggleVpn(true)
                     }
                 )
@@ -319,20 +352,20 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        containerColor = WarningContainer
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "No blocking rules configured",
+                            text = "No Blocking Rules Configured",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         val blocklistWarningText = buildAnnotatedString {
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onTertiaryContainer)) {
-                                append("Add blocklists containing TLDs or domains to start filtering. Use your own and ")
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
+                                append("Add blocklists containing TLDs or domains to start filtering. Use your own or ")
                             }
                             withLink(LinkAnnotation.Url(
                                 url = "https://iadefensa.com/solutions/awagam-chromium/#blocklists"
@@ -344,7 +377,7 @@ fun HomeScreen(
                                     append("existing blocklists")
                                 }
                             }
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onTertiaryContainer)) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurface)) {
                                 append(". URL-only blocklists are not supported at the DNS level.")
                             }
                         }
@@ -602,6 +635,10 @@ private fun VpnErrorCard(
     val errorMessage = when {
         error == UserPreferences.VPN_ERROR_ANOTHER_VPN ->
             "Could not start protection. Another VPN appears to be active. Android only allows one VPN at a time."
+        error == UserPreferences.VPN_ERROR_PERMISSION_DENIED ->
+            "Android did not grant the VPN connection. If another VPN app is set as always-on, turn that off in your VPN settings, then try again."
+        error == UserPreferences.VPN_ERROR_START_TIMEOUT ->
+            "Protection did not start in time. Another VPN may be holding the connection, or the blocklists may be too large to load. Try again."
         isDoHError -> {
             val detail = error.removePrefix("${UserPreferences.VPN_ERROR_DOH_FAILED}:")
             "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection or try a different DNS provider in your system settings."

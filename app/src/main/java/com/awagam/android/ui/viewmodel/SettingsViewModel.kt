@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.ui.viewmodel
@@ -11,6 +12,7 @@ import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -36,7 +38,8 @@ data class SettingsUiState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
-    val exportContent: String? = null
+    val exportContent: String? = null,
+    val autoStart: Boolean = false
 )
 
 /**
@@ -47,8 +50,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val blocklistManager = ExternalBlocklistManager(application)
     private val blocklistRepository = DependencyContainer.getBlocklistRepository()
+    private val userPreferences = UserPreferences(application)
     private val exporter = BlocklistExporter(application)
-    private val json = Json { prettyPrint = true }
+    // `encodeDefaults` so the export states every field explicitly, including
+    // `updateInterval`: The browser extension honors per-list intervals and
+    // substitutes its own 6-hour default for a missing one, which would refresh
+    // imported lists four times as often as this app says it does
+    private val json = Json {
+        prettyPrint = true
+        encodeDefaults = true
+    }
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -72,6 +83,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
             }
+        }
+
+        viewModelScope.launch {
+            userPreferences.autoStartFlow.collect { autoStart ->
+                _uiState.update { it.copy(autoStart = autoStart) }
+            }
+        }
+    }
+
+    fun setAutoStart(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setAutoStart(enabled)
         }
     }
 

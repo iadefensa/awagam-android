@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.worker
@@ -42,11 +43,6 @@ class VpnWatchdogWorker(
             )
 
             Log.d(TAG, "Scheduled VPN watchdog every 15 minutes")
-        }
-
-        fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-            Log.d(TAG, "Canceled VPN watchdog")
         }
     }
 

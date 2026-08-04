@@ -1,8 +1,9 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.ui.screens
 
-import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,7 +39,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -57,6 +58,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -67,13 +71,18 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.ui.theme.Warning
+import com.awagam.android.ui.theme.awagamSwitchColors
 import com.awagam.android.ui.viewmodel.SettingsViewModel
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +97,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
+    // Remembered so the export dialog can share the same format it is showing
+    var exportFormat by remember { mutableStateOf<BlocklistExporter.Format?>(null) }
     var editingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -130,6 +141,15 @@ fun SettingsScreen(
         }
     }
 
+    // Hand the generated export file to the system share sheet
+    val shareIntent by viewModel.shareIntent.collectAsState()
+    LaunchedEffect(shareIntent) {
+        shareIntent?.let { intent ->
+            context.startActivity(Intent.createChooser(intent, "Share blocklist"))
+            viewModel.clearShareIntent()
+        }
+    }
+
     // Show snackbar for success or error messages
     LaunchedEffect(uiState.successMessage, uiState.error) {
         val message = uiState.successMessage ?: uiState.error
@@ -143,7 +163,7 @@ fun SettingsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Blocklists") },
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -286,11 +306,11 @@ fun SettingsScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Blocklists",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                SectionHeader(
+                    title = "Blocklists",
+                    description = "All blocklists are refreshed every " +
+                        "${TimeUnit.MILLISECONDS.toHours(BLOCKLIST_REFRESH_INTERVAL_MS)} hours, " +
+                        "and immediately when you add one."
                 )
             }
 
@@ -335,7 +355,52 @@ fun SettingsScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
+                SectionHeader(
+                    title = "Start on Boot",
+                    description = "Needs VPN permission to have been granted once."
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Pairs the label with the switch for TalkBack, and makes
+                            // the row the target rather than the switch alone
+                            .toggleable(
+                                value = uiState.autoStart,
+                                role = Role.Switch,
+                                onValueChange = { viewModel.setAutoStart(it) }
+                            )
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Turn protection back on after the device restarts",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = uiState.autoStart,
+                            onCheckedChange = null,
+                            colors = awagamSwitchColors()
+                        )
+                    }
+                }
+            }
+
+            item {
+                // Clears the FAB: 56 dp tall, sitting 16 dp up, against the
+                // list’s own 16 dp bottom padding
+                Spacer(modifier = Modifier.height(56.dp))
             }
         }
     }
@@ -368,6 +433,7 @@ fun SettingsScreen(
         ExportFormatDialog(
             onDismiss = { showExportFormatDialog = false },
             onSelectFormat = { format ->
+                exportFormat = format
                 viewModel.generateExport(format)
                 showExportFormatDialog = false
             }
@@ -378,13 +444,56 @@ fun SettingsScreen(
     uiState.exportContent?.let { content ->
         ImportExportDialog(
             title = "Export for DNS Filtering",
-            description = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools:",
+            description = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools, or share it as a file:",
             isImport = false,
             onDismiss = { viewModel.clearExportContent() },
             onConfirm = { viewModel.clearExportContent() },
-            exportData = content
+            exportData = content,
+            onShare = exportFormat?.let { format -> { viewModel.shareExport(format) } }
         )
     }
+}
+
+/**
+ * Render the stored UTC timestamp in local time, so a list that silently stopped
+ * refreshing is visible rather than a matter of trust.
+ */
+private fun formatLastUpdated(lastUpdated: String?): String {
+    if (lastUpdated == null) return "Never refreshed"
+
+    return try {
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val date = parser.parse(lastUpdated) ?: return "Last refresh unknown"
+        // Locale-aware parts, joined here so the comma after the year does not
+        // depend on the platform’s date-time pattern
+        val day = DateFormat.getDateInstance(DateFormat.MEDIUM).format(date)
+        val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date)
+        "Refreshed $day, $time"
+    } catch (e: Exception) {
+        "Last refresh unknown"
+    }
+}
+
+/**
+ * Heading that opens a settings section, including the gap that separates it
+ * from the section before.
+ */
+@Composable
+private fun SectionHeader(title: String, description: String) {
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = description,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable
@@ -399,7 +508,7 @@ private fun BlocklistCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (blocklist.enabled) {
-                MaterialTheme.colorScheme.surface
+                MaterialTheme.colorScheme.surfaceVariant
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             }
@@ -425,10 +534,25 @@ private fun BlocklistCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
+                    // Parsing and formatting outlive a toggle or a refresh
+                    // changing some other field of the same card
+                    val lastRefreshed = remember(blocklist.lastUpdated) {
+                        formatLastUpdated(blocklist.lastUpdated)
+                    }
+                    Text(
+                        text = lastRefreshed,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+                // Named rather than made a row toggle: The card carries its own
+                // refresh, edit, and delete actions, so a row-wide target would
+                // fire on taps meant for those
                 Switch(
                     checked = blocklist.enabled,
-                    onCheckedChange = { onToggle() }
+                    onCheckedChange = { onToggle() },
+                    colors = awagamSwitchColors(),
+                    modifier = Modifier.semantics { contentDescription = blocklist.name }
                 )
             }
 
@@ -592,7 +716,8 @@ private fun ImportExportDialog(
     isImport: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
-    exportData: String?
+    exportData: String?,
+    onShare: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf(exportData ?: "") }
 
@@ -624,8 +749,15 @@ private fun ImportExportDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            Row {
+                onShare?.let { share ->
+                    TextButton(onClick = share) {
+                        Text("Share")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
             }
         }
     )

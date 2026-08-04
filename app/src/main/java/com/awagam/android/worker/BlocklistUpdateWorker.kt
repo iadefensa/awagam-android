@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.worker
@@ -37,8 +38,9 @@ class BlocklistUpdateWorker(
         private const val WORK_NAME = "blocklist_update"
 
         /**
-         * Schedule periodic blocklist updates.
-         * Default: every 6 hours when connected to network.
+         * Schedule periodic blocklist update checks.
+         * Default: Every 6 hours when connected to network; a check only refetches
+         * the lists whose last refresh is older than `BLOCKLIST_REFRESH_INTERVAL_MS`.
          */
         fun schedule(context: Context, intervalHours: Long = 6) {
             val constraints = Constraints.Builder()
@@ -58,15 +60,7 @@ class BlocklistUpdateWorker(
                 request
             )
 
-            Log.d(TAG, "Scheduled blocklist updates every $intervalHours hours")
-        }
-
-        /**
-         * Cancel scheduled updates.
-         */
-        fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-            Log.d(TAG, "Canceled blocklist updates")
+            Log.d(TAG, "Scheduled blocklist update checks every $intervalHours hours")
         }
     }
 
@@ -75,7 +69,10 @@ class BlocklistUpdateWorker(
 
         return try {
             val manager = ExternalBlocklistManager(applicationContext)
-            manager.refreshAllBlocklists()
+            // Every list refreshes on the same cadence (24 hours), so the more
+            // frequent wake only narrows how long a due list stays stale—it
+            // never refetches multi-megabyte lists ahead of that cadence
+            manager.refreshBlocklistsIfNeeded()
 
             // Only actual failures—“warning” also carries an `errorMessage` (a
             // bundle’s skipped imports), but that refresh succeeded

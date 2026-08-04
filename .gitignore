@@ -22,4 +22,5 @@ keystore.properties
 # Misc
 .cxx/
 .externalNativeBuild/
+.kotlin/
 captures/

@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.data.blocklist
@@ -23,7 +24,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Dns
@@ -674,26 +674,6 @@ class ExternalBlocklistManager(private val context: Context) {
         return source.readString(Charsets.UTF_8)
     }
 
-    private fun calculateMetadata(groups: Map<String, BlocklistGroup>): BlocklistMetadata {
-        var tlds = 0
-        var domains = 0
-        var urls = 0
-
-        groups.values.forEach { group ->
-            tlds += group.tlds.size
-            domains += group.domains.size
-            urls += group.urls.size
-        }
-
-        return BlocklistMetadata(
-            totalRules = tlds + domains + urls,
-            tlds = tlds,
-            domains = domains,
-            urls = urls,
-            groups = groups.size
-        )
-    }
-
     private fun getIsoTimestamp(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -744,20 +724,6 @@ class ExternalBlocklistManager(private val context: Context) {
             }
         }
         migrateCacheFromPreferences(id)
-    }
-
-    /**
-     * Get all cached blocklist data for enabled configs.
-     */
-    suspend fun getAllCachedBlocklists(): Map<String, String> = withContext(Dispatchers.IO) {
-        val result = mutableMapOf<String, String>()
-        getConfigsSnapshot().filter { it.enabled }.forEach { config ->
-            val cached = getCachedBlocklist(config.id)
-            if (cached != null) {
-                result[config.id] = cached
-            }
-        }
-        result
     }
 
     /**
@@ -831,7 +797,9 @@ class ExternalBlocklistManager(private val context: Context) {
     }
 
     /**
-     * Check if a blocklist needs to be updated based on its update interval.
+     * Check whether a blocklist is due for a refresh.
+     * The cadence is [BLOCKLIST_REFRESH_INTERVAL_MS] for every list, never the
+     * config’s own `updateInterval`—see the constant for why.
      */
     fun needsUpdate(config: ExternalBlocklistConfig): Boolean {
         val lastUpdated = config.lastUpdated ?: return true
@@ -841,14 +809,14 @@ class ExternalBlocklistManager(private val context: Context) {
             sdf.timeZone = TimeZone.getTimeZone("UTC")
             val lastUpdateTime = sdf.parse(lastUpdated)?.time ?: return true
             val now = System.currentTimeMillis()
-            (now - lastUpdateTime) >= config.updateInterval
+            (now - lastUpdateTime) >= BLOCKLIST_REFRESH_INTERVAL_MS
         } catch (e: Exception) {
             true // If we can't parse the date, assume update is needed
         }
     }
 
     /**
-     * Refresh blocklists that need updating based on their update interval.
+     * Refresh the blocklists that are due.
      */
     suspend fun refreshBlocklistsIfNeeded() {
         refreshBlocklists { needsUpdate(it) }

@@ -97,7 +97,7 @@ com.awagam.android/
 ├── ui/viewmodel/            # Home, Settings, Statistics ViewModels
 ├── ui/theme/                # Material 3 theme
 ├── vpn/                     # AWAGAMVpnService
-└── worker/                  # BlocklistUpdateWorker (6h), VpnWatchdogWorker (15min)
+└── worker/                  # BlocklistUpdateWorker (6h check, 24h per list), VpnWatchdogWorker (15min)
 ```
 
 Tests: `BlocklistParserTest`, `BlocklistValidatorTest`, `DnsPacketTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`

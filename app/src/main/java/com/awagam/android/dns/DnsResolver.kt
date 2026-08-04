@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android.dns
@@ -492,6 +493,13 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return patched
     }
 
+    /**
+     * Called whenever an upstream query succeeds, so a caller that warned about
+     * an unreachable upstream can retract that once traffic is flowing again.
+     */
+    @Volatile
+    var onUpstreamSuccess: (() -> Unit)? = null
+
     private fun forwardToUpstream(dnsPayload: ByteArray): ByteArray? {
         val request = Request.Builder()
             .url(upstreamDnsUrl)
@@ -502,6 +510,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
+                    onUpstreamSuccess?.invoke()
                     // Read with a hard cap rather than `bytes()`, which would buffer
                     // however much the upstream chooses to send (chunked responses
                     // don’t announce a length up front)

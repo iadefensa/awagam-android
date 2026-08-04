@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Jens Oliver Meiert (IA Defensa)
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package com.awagam.android
@@ -44,6 +45,10 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             startVpnService()
+        } else {
+            lifecycleScope.launch {
+                userPreferences.setVpnError(UserPreferences.VPN_ERROR_PERMISSION_DENIED)
+            }
         }
     }
 
@@ -101,6 +106,11 @@ class MainActivity : ComponentActivity() {
             val isEnabled = userPreferences.isEnabledFlow.first()
             if (isEnabled && !AWAGAMVpnService.isServiceRunning && !AWAGAMVpnService.pendingStop) {
                 startVpnService()
+            } else if (!isEnabled && AWAGAMVpnService.isServiceRunning && !AWAGAMVpnService.pendingStop) {
+                userPreferences.setEnabled(true)
+                // A “failed to start” banner left over from the attempt that
+                // preceded this tunnel would contradict what is now running
+                userPreferences.clearVpnError()
             }
         }
     }
