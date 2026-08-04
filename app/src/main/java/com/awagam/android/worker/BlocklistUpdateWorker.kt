@@ -60,7 +60,7 @@ class BlocklistUpdateWorker(
                 request
             )
 
-            Log.d(TAG, "Scheduled blocklist updates every $intervalHours hours")
+            Log.d(TAG, "Scheduled blocklist update checks every $intervalHours hours")
         }
     }
 
