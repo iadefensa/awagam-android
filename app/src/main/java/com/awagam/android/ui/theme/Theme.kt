@@ -5,6 +5,8 @@ package com.awagam.android.ui.theme
 
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
@@ -51,3 +53,23 @@ fun AWAGAMTheme(
         content = content
     )
 }
+
+/**
+ * Switch colors for every toggle in the app.
+ * Only the unchecked state is overridden: The Material default draws thumb and
+ * track in the colors of the card behind them.
+ */
+@Composable
+fun awagamSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+/**
+ * Switch colors for the main protection toggle, green when on to match its label.
+ */
+@Composable
+fun protectionSwitchColors(): SwitchColors = awagamSwitchColors().copy(
+    checkedThumbColor = MaterialTheme.colorScheme.tertiary,
+    checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+)
