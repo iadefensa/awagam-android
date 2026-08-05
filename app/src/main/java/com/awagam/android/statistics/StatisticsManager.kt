@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -159,6 +160,15 @@ class StatisticsManager(private val context: Context) {
             totalBytes = preferences.counter(TOTAL_BYTES) + pendingBytes.get()
         )
     }
+
+    /**
+     * Lifetime blocked-query count, including the not-yet-flushed delta.
+     * A one-shot read for callers that need the number occasionally: collecting
+     * `statisticsFlow` would start `displayTicker` and leave it running at 1 Hz
+     * for as long as the collector lives, which is far more than they need.
+     */
+    suspend fun currentBlockedQueries(): Long =
+        context.statisticsDataStore.data.first().counter(BLOCKED_QUERIES) + pendingBlocked.get()
 
     /**
      * Read a counter, tolerating values written as `Int` by earlier versions.
@@ -353,6 +363,9 @@ class StatisticsManager(private val context: Context) {
 
     /**
      * Get formatted data usage string.
+     * Byte units take a non-breaking space, so a measurement never wraps across
+     * lines. Compact counts are the other case: “1.2K” is a magnitude suffix,
+     * not a unit, and closes up.
      */
     fun formatDataUsage(bytes: Long): String {
         val kb = bytes / 1024.0
@@ -360,10 +373,10 @@ class StatisticsManager(private val context: Context) {
         val gb = mb / 1024.0
 
         return when {
-            gb >= 1 -> "%.2f GB".format(gb)
-            mb >= 1 -> "%.2f MB".format(mb)
-            kb >= 1 -> "%.2f KB".format(kb)
-            else -> "$bytes B"
+            gb >= 1 -> "%.2f GB".format(gb)
+            mb >= 1 -> "%.2f MB".format(mb)
+            kb >= 1 -> "%.2f KB".format(kb)
+            else -> "$bytes B"
         }
     }
 }
