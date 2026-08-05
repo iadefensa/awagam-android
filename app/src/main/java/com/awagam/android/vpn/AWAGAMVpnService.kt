@@ -184,6 +184,11 @@ class AWAGAMVpnService : VpnService() {
                 // Load blocklists before starting
                 blocklistRepository.loadBlocklists()
 
+                // A stop landing during the load cancels this job, but the launch
+                // below is not itself a suspension point—without this it would
+                // start an updater that `stopVpn()` has already cancelled
+                ensureActive()
+
                 // Start only now: Before the load, a rule count of zero would
                 // mean “nothing loaded yet” rather than “nothing to block”
                 startNotificationUpdates()
