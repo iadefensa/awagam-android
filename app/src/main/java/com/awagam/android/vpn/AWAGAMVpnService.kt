@@ -3,6 +3,8 @@
 
 package com.awagam.android.vpn
 
+import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
@@ -17,6 +19,7 @@ import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
 import com.awagam.android.dns.DnsResolver
 import com.awagam.android.statistics.StatisticsManager
+import com.awagam.android.util.formatCompact
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +63,10 @@ class AWAGAMVpnService : VpnService() {
         private const val DOH_PROBE_ATTEMPTS = 3
         private const val DOH_PROBE_RETRY_DELAY_MS = 2_000L
 
+        // Matches the statistics flush cadence: Refreshing faster would only
+        // re-post the same numbers, and the notification is ambient information
+        private const val NOTIFICATION_UPDATE_INTERVAL_MS = 30_000L
+
         // Check whether VPN service is actively running;
         // volatile for cross-thread visibility
         @Volatile
@@ -87,6 +94,12 @@ class AWAGAMVpnService : VpnService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var startupJob: Job? = null
     private var processingJob: Job? = null
+    private var notificationJob: Job? = null
+
+    // Text currently shown in the notification, so an update that would not
+    // change it is skipped; null until the blocklists have loaded
+    @Volatile
+    private var postedText: String? = null
 
     private lateinit var blocklistRepository: BlocklistRepository
     private lateinit var userPreferences: UserPreferences
@@ -136,6 +149,16 @@ class AWAGAMVpnService : VpnService() {
     }
 
     private fun startVpn() {
+        // First thing, and synchronously: `startForegroundService()` gives us about
+        // five seconds to reach `startForeground()` before the system kills the
+        // process, and the blocklist load below can outlast that on a cold boot
+        // with a large list. Re-posting for an already-running tunnel is harmless,
+        // and it settles the obligation from every redundant start intent.
+        startForeground(
+            AWAGAMApplication.NOTIFICATION_ID,
+            buildNotification(postedText ?: getString(R.string.vpn_notification_text_loading))
+        )
+
         if (isRunning) {
             Log.d(TAG, "VPN already running")
             // A live tunnel with the preference still off leaves the toggle stuck:
@@ -161,6 +184,15 @@ class AWAGAMVpnService : VpnService() {
                 // Load blocklists before starting
                 blocklistRepository.loadBlocklists()
 
+                // A stop landing during the load cancels this job, but the launch
+                // below is not itself a suspension point—without this it would
+                // start an updater that `stopVpn()` has already cancelled
+                ensureActive()
+
+                // Start only now: Before the load, a rule count of zero would
+                // mean “nothing loaded yet” rather than “nothing to block”
+                startNotificationUpdates()
+
                 // Clear stale DNS cache from any prior session
                 dnsResolver.clearCache()
 
@@ -180,9 +212,6 @@ class AWAGAMVpnService : VpnService() {
                         serviceScope.launch { userPreferences.clearVpnError() }
                     }
                 }
-
-                // Start foreground service with notification
-                startForeground(AWAGAMApplication.NOTIFICATION_ID, createNotification())
 
                 // Bail out if stop was requested during initialization
                 ensureActive()
@@ -450,6 +479,11 @@ class AWAGAMVpnService : VpnService() {
         processingJob?.cancel()
         processingJob = null
 
+        // Stop before `stopForeground()` below, so a late stats emission
+        // cannot re-post the notification we are about to remove
+        notificationJob?.cancel()
+        notificationJob = null
+
         vpnInterface?.close()
         vpnInterface = null
 
@@ -481,7 +515,12 @@ class AWAGAMVpnService : VpnService() {
         stopSelf()
     }
 
-    private suspend fun createNotification(): android.app.Notification {
+    /**
+     * Build the ongoing notification.
+     * Kept free of suspending work so the caller can post it without delay;
+     * `text` is prepared separately by `notificationText()`.
+     */
+    private fun buildNotification(text: String): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -489,16 +528,78 @@ class AWAGAMVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stats = blocklistRepository.blocklistStats.first()
-        val totalRules = stats.tldCount + stats.domainCount
-
         return NotificationCompat.Builder(this, AWAGAMApplication.NOTIFICATION_CHANNEL_ID)
             .setContentTitle(getString(R.string.vpn_notification_title))
-            .setContentText(getString(R.string.vpn_notification_text, totalRules))
+            .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_vpn)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
+    }
+
+    /**
+     * Compose the notification’s second line: lifetime blocked requests, then the
+     * loaded rule count. “Rules” rather than “domains” because the count covers
+     * both TLD and domain entries, matching what the home screen reports.
+     */
+    private suspend fun notificationText(): String {
+        val stats = blocklistRepository.blocklistStats.value
+        val totalRules = stats.tldCount + stats.domainCount
+        val blocked = statisticsManager.currentBlockedQueries()
+
+        // `getQuantityString` selects on the true count, but interpolates the
+        // abbreviated one, so “1.4M” never has to be parsed back into a number
+        val blockedText = resources.getQuantityString(
+            R.plurals.vpn_notification_blocked,
+            blocked.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            formatCompact(blocked)
+        )
+        val rulesText = resources.getQuantityString(
+            R.plurals.vpn_notification_rules,
+            totalRules,
+            formatCompact(totalRules.toLong())
+        )
+        return getString(R.string.vpn_notification_text, blockedText, rulesText)
+    }
+
+    /**
+     * Keep the notification’s counts current while the tunnel runs.
+     * Polled rather than driven by `statisticsFlow`, whose 1 Hz display ticker
+     * would then run for the whole session; the interval matches the statistics
+     * flush cadence, so the notification never shows a number that is fresher
+     * than what the app itself has recorded.
+     */
+    private fun startNotificationUpdates() {
+        notificationJob?.cancel()
+        notificationJob = serviceScope.launch {
+            while (isActive) {
+                updateNotification()
+                delay(NOTIFICATION_UPDATE_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
+     * Refresh the posted notification, unless nothing changed or the user swiped
+     * it away. Android 13 and later let them dismiss it while the tunnel keeps
+     * running; re-posting would resurrect a notification they deliberately
+     * dismissed, and the system’s VPN key icon still discloses that the tunnel is up.
+     */
+    private suspend fun updateNotification() {
+        val text = notificationText()
+        if (text == postedText) return
+
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        val stillPosted = notificationManager.activeNotifications.any {
+            it.id == AWAGAMApplication.NOTIFICATION_ID
+        }
+        if (!stillPosted) {
+            Log.d(TAG, "Notification dismissed by user, not re-posting")
+            return
+        }
+
+        postedText = text
+        notificationManager.notify(AWAGAMApplication.NOTIFICATION_ID, buildNotification(text))
     }
 
     override fun onRevoke() {

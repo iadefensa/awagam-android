@@ -274,7 +274,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 // Reject oversized bodies before parsing them
                 val importSize = BlocklistValidator.utf8Size(importBody)
                 if (importSize > MAX_BLOCKLIST_SIZE) {
-                    failures.add("${entry.importUrl} (blocklist too large (max 10 MB))")
+                    failures.add("${entry.importUrl} (blocklist too large (max 10 MB))")
                     return@forEachIndexed
                 }
 
@@ -303,7 +303,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     // limit—a skipped import must not be able to fail the bundle
                     totalSize += importSize
                     if (totalSize > MAX_BLOCKLIST_SIZE) {
-                        throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
+                        throw Exception("Bundle too large. The combined size of all imported blocklists exceeds 10 MB.")
                     }
                     // Group-limit failures inside the merge stay fatal
                     mergeImportedGroups(merged, importGroups, index)
@@ -487,7 +487,7 @@ class ExternalBlocklistManager(private val context: Context) {
 
             // Validate size (DoS protection)
             if (!BlocklistValidator.validateSize(body)) {
-                throw Exception("Blocklist too large. Maximum size is 10 MB.")
+                throw Exception("Blocklist too large. Maximum size is 10 MB.")
             }
 
             // Parse JSON
@@ -511,7 +511,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 bodyToCache = json.encodeToString(resolved.groups)
                 // Guard the cache as well—group ID prefixes can grow the merged result past the fetched sizes
                 if (!BlocklistValidator.validateSize(bodyToCache)) {
-                    throw Exception("Bundle too large. The merged blocklist exceeds 10 MB.")
+                    throw Exception("Bundle too large. The merged blocklist exceeds 10 MB.")
                 }
                 metadata = resolved.metadata
                 warning = resolved.warning
@@ -669,7 +669,7 @@ class ExternalBlocklistManager(private val context: Context) {
     private fun readCapped(body: ResponseBody): String {
         val source = body.source()
         if (source.request(MAX_BLOCKLIST_SIZE + 1L)) {
-            throw Exception("Blocklist too large. Maximum size is 10 MB.")
+            throw Exception("Blocklist too large. Maximum size is 10 MB.")
         }
         return source.readString(Charsets.UTF_8)
     }

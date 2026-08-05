@@ -72,24 +72,7 @@ import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.ui.theme.WarningContainer
 import com.awagam.android.ui.theme.protectionSwitchColors
 import com.awagam.android.ui.viewmodel.HomeViewModel
-
-/**
- * Format a number compactly for display in space-constrained cards.
- * Examples: 0 → 0, 999 → 999, 1000 → 1K, 1200 → 1.2K, 12345 → 12.3K, 1000000 → 1M
- */
-private fun formatCompact(value: Long): String {
-    return when {
-        value < 1_000 -> value.toString()
-        value < 1_000_000 -> {
-            val k = value / 1_000.0
-            "%.1f".format(k).removeSuffix(".0") + "K"
-        }
-        else -> {
-            val m = value / 1_000_000.0
-            "%.1f".format(m).removeSuffix(".0") + "M"
-        }
-    }
-}
+import com.awagam.android.util.formatCompact
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

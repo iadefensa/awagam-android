@@ -21,7 +21,9 @@ import androidx.work.WorkerParameters
 import com.awagam.android.AWAGAMApplication
 import com.awagam.android.MainActivity
 import com.awagam.android.R
+import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import com.awagam.android.di.DependencyContainer
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -69,15 +71,27 @@ class BlocklistUpdateWorker(
 
         return try {
             val manager = ExternalBlocklistManager(applicationContext)
+            val before = refreshState(manager.blocklistsFlow.first())
+
             // Every list refreshes on the same cadence (24 hours), so the more
             // frequent wake only narrows how long a due list stays stale—it
             // never refetches multi-megabyte lists ahead of that cadence
             manager.refreshBlocklistsIfNeeded()
 
+            val configs = manager.blocklistsFlow.first()
+
+            // Refreshing only rewrites the cache files; queries are answered from
+            // the repository’s in-memory matcher, which is built by
+            // `loadBlocklists()` alone. Without this the tunnel would keep
+            // blocking by the previous rules until the app or tunnel restarts.
+            if (refreshState(configs) != before) {
+                DependencyContainer.getBlocklistRepository().loadBlocklists()
+                Log.d(TAG, "Blocklists changed, reloaded matcher")
+            }
+
             // Only actual failures—“warning” also carries an `errorMessage` (a
             // bundle’s skipped imports), but that refresh succeeded
-            val failedConfigs = manager.blocklistsFlow.first()
-                .filter { it.enabled && it.status == "error" }
+            val failedConfigs = configs.filter { it.enabled && it.status == "error" }
             if (failedConfigs.isNotEmpty()) {
                 notifyRefreshFailure(failedConfigs.size)
             }
@@ -87,8 +101,29 @@ class BlocklistUpdateWorker(
         } catch (e: Exception) {
             Log.e(TAG, "Blocklist update failed", e)
             Result.retry()
+        } catch (e: OutOfMemoryError) {
+            // Parsing and rebuilding hold two full rule sets at once, so a large
+            // enough list can exhaust the heap. Letting it propagate would take
+            // the process down and with it the tunnel, to skip one refresh.
+            // Contained here because the damage is bounded: `loadBlocklists()`
+            // publishes the matcher only once it is fully built, so the rules
+            // already in force are untouched and keep blocking.
+            // Not `retry()`—an immediate second attempt would exhaust the heap
+            // again; the next periodic run tries afresh.
+            Log.e(TAG, "Out of memory updating blocklists, skipping this run", e)
+            Result.failure()
         }
     }
+
+    /**
+     * Which enabled lists there are, and when each last refreshed successfully.
+     * `lastUpdated` moves only on a refetch that succeeded, so comparing this
+     * across the refresh tells whether any rules actually changed. Rebuilding
+     * the matcher holds the old and the new rule set in memory at once, which is
+     * not worth doing every six hours for lists that mostly did not move.
+     */
+    private fun refreshState(configs: List<ExternalBlocklistConfig>): Set<Pair<String, String?>> =
+        configs.filter { it.enabled }.map { it.id to it.lastUpdated }.toSet()
 
     private fun notifyRefreshFailure(failedCount: Int) {
         if (ContextCompat.checkSelfPermission(applicationContext, android.Manifest.permission.POST_NOTIFICATIONS)
