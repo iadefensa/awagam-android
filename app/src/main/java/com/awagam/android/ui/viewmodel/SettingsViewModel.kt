@@ -118,10 +118,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setUpstreamDns(provider: DnsProvider) {
         viewModelScope.launch {
             userPreferences.setUpstreamDns(provider.url)
-            DependencyContainer.getDnsResolver().apply {
-                setUpstreamDns(provider.url)
-                clearCache()
-            }
+            DependencyContainer.getDnsResolver().switchUpstreamDns(provider.url)
             _uiState.update { it.copy(successMessage = "Now using ${provider.name}") }
         }
     }
