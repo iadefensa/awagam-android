@@ -10,7 +10,7 @@ What is left before the first release. Delete this file once 1.0.0 is out.
 
 * [ ] Take screenshots of the finished app (at least 2 [1080×1920?], phone-sized)
   - [ ] Add them to `fastlane/metadata/android/en-US/images/phoneScreenshots/`
-* [ ] Add a 1024×500 feature graphic as `featureGraphic.png` in the same directory (Play Store requires it; the 512×512 `icon.png` is already in place)
+* [ ] Add a 1024×500 feature graphic as `featureGraphic.png` in `fastlane/metadata/android/en-US/images/` (Play Store requires it; the 512×512 `icon.png` is already in place there)
 * [ ] Fill the screenshot and release placeholders in the [iadefensa.com solution page](https://iadefensa.com/solutions/awagam-android/)
 
 ## Version
