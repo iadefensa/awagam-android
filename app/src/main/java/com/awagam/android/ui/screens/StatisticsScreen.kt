@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.awagam.android.ui.theme.ErrorText
 import com.awagam.android.ui.viewmodel.StatisticsViewModel
 import java.text.NumberFormat
 
@@ -106,7 +107,7 @@ fun StatisticsScreen(
                         ProgressRow(
                             label = "Block Rate",
                             progress = (statistics?.blockRate?.toFloat() ?: 0f),
-                            color = MaterialTheme.colorScheme.error
+                            color = ErrorText
                         )
                     }
                 }

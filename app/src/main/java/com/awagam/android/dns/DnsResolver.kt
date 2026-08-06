@@ -5,6 +5,7 @@ package com.awagam.android.dns
 
 import android.util.Log
 import com.awagam.android.data.blocklist.BlocklistRepository
+import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.statistics.StatisticsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,8 +44,10 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         private val BLOCKED_IPV6 = InetAddress.getByName("::")
 
         // Hardcoded IPs for DoH servers to avoid DNS lookup chicken-and-egg problem
-        // When the VPN is active, DNS queries go through us, so we can’t use DNS to resolve DoH servers
-        private val DOH_SERVER_IPS = mapOf(
+        // When the VPN is active, DNS queries go through us, so we can’t use DNS to resolve DoH servers.
+        // Internal so a test can hold `DnsProviders` to it: A selectable provider
+        // missing from here would fall through to system DNS
+        internal val DOH_SERVER_IPS = mapOf(
             // DNS4EU (EU-based, GDPR-compliant)
             "protective.joindns4.eu" to listOf("86.54.11.1", "86.54.11.201", "2a13:1001::86:54:11:1", "2a13:1001::86:54:11:201"),
             "child.joindns4.eu" to listOf("86.54.11.12", "86.54.11.212", "2a13:1001::86:54:11:12", "2a13:1001::86:54:11:212"),
@@ -238,8 +241,11 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         }
     }
 
-    // Default: DNS4EU Protective (EU-based, blocks malware/phishing)
-    private var upstreamDnsUrl = "https://protective.joindns4.eu/dns-query"
+    // Default: DNS4EU Protective (EU-based, blocks malware/phishing).
+    // Volatile because the settings screen can switch providers mid-session,
+    // from a different thread than the one resolving queries.
+    @Volatile
+    private var upstreamDnsUrl = DnsProviders.DEFAULT.url
     private val dnsCache = DnsCache()
     private var statisticsManager: StatisticsManager? = null
     private var protectedSocketFactory: SocketFactory? = null

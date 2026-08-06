@@ -88,7 +88,7 @@ com.awagam.android/
 ├── AWAGAMApplication.kt     # Init, DI, notifications, WorkManager
 ├── MainActivity.kt          # Entry, VPN permission, navigation
 ├── data/blocklist/          # BlocklistRepository, DomainMatcher, Exporter, Models, Validator, ExternalBlocklistManager
-├── data/preferences/        # UserPreferences (DataStore)
+├── data/preferences/        # UserPreferences (DataStore), DnsProviders (upstream catalog)
 ├── di/                      # DependencyContainer
 ├── dns/                     # DnsCache (LRU+TTL), DnsResolver (DoH)
 ├── receiver/                # BootReceiver
@@ -96,11 +96,12 @@ com.awagam.android/
 ├── ui/screens/              # Home, Settings, Statistics
 ├── ui/viewmodel/            # Home, Settings, Statistics ViewModels
 ├── ui/theme/                # Material 3 theme
+├── util/                    # NumberFormatting
 ├── vpn/                     # AWAGAMVpnService
 └── worker/                  # BlocklistUpdateWorker (6h check, 24h per list), VpnWatchdogWorker (15min)
 ```
 
-Tests: `BlocklistParserTest`, `BlocklistValidatorTest`, `DnsPacketTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`
+Tests: `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsResolverTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
 
 ## Contributing
 

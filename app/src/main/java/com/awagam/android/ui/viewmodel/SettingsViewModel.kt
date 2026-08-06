@@ -12,6 +12,8 @@ import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
+import com.awagam.android.data.preferences.DnsProvider
+import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
 import java.text.SimpleDateFormat
@@ -39,7 +41,8 @@ data class SettingsUiState(
     val error: String? = null,
     val successMessage: String? = null,
     val exportContent: String? = null,
-    val autoStart: Boolean = false
+    val autoStart: Boolean = false,
+    val upstreamDns: DnsProvider = DnsProviders.DEFAULT
 )
 
 /**
@@ -90,11 +93,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(autoStart = autoStart) }
             }
         }
+
+        viewModelScope.launch {
+            userPreferences.upstreamDnsFlow.collect { url ->
+                _uiState.update { it.copy(upstreamDns = DnsProviders.forUrl(url)) }
+            }
+        }
     }
 
     fun setAutoStart(enabled: Boolean) {
         viewModelScope.launch {
             userPreferences.setAutoStart(enabled)
+        }
+    }
+
+    /**
+     * Switch the upstream resolver, for a running tunnel as well as the next one.
+     * The service reads the preference only at startup, so the live resolver is
+     * updated here too—otherwise the choice would not take effect until
+     * protection is toggled off and on. Cached answers came from the previous
+     * resolver, whose filtering may differ, and cache keys don’t record which
+     * one answered, so the cache is dropped rather than served across the switch.
+     */
+    fun setUpstreamDns(provider: DnsProvider) {
+        viewModelScope.launch {
+            userPreferences.setUpstreamDns(provider.url)
+            DependencyContainer.getDnsResolver().apply {
+                setUpstreamDns(provider.url)
+                clearCache()
+            }
+            _uiState.update { it.copy(successMessage = "Now using ${provider.name}") }
         }
     }
 

@@ -13,23 +13,48 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// Amber-400 (semantic: warning, matching the extension’s warning status)—
-// Material 3 color schemes have no warning slot (contrast with surface ≈ 8:1)
+// Amber-400 (semantic: warning, matching the AWAGAM extension’s warning
+// status)—Material 3 color schemes have no warning slot (contrast with
+// surface ≈ 8:1)
 val Warning = Color(0xFFFBBF24)
 
 // Amber-900, the container step for `[Warning]`, matching how the green and red
 // containers pair with their foreground colors (contrast with light text ≈ 8.5:1)
 val WarningContainer = Color(0xFF78350F)
 
-// Shadcn-style neutral palette (matching extension design)
+// The iadefensa.com accent, and the app’s one bright color. It marks whatever
+// matters most on a screen, following the site, where lime is the primary
+// action: on Home the protection state (status line, card tint, toggle), in
+// settings the button that adds a blocklist.
+val Brand = Color(0xFFCEFF1A)
+
+// Black on lime, as on the site’s primary buttons (≈ 17.9:1)
+val OnBrand = Color(0xFF000000)
+
+// Red-300 (semantic: error), the same idea for red. `error` is red-600, sized so
+// white reads on it as a fill; against the `surfaceVariant` cards that carry the
+// blocklist errors, the delete action, and the block-rate bar it is only ≈ 2.2:1.
+// Red-400 still falls short for text, hence the lighter step (≈ 5.5:1).
+val ErrorText = Color(0xFFFCA5A5)
+
+// Shadcn-style neutral palette (matching AWAGAM extension design)
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFFEBEBEB),            // Near-white (matching Basecoat primary)
     onPrimary = Color(0xFF000000),          // Black text on primary
+    // Same pair again, for the components that reach for the container slots—
+    // the settings FAB above all. Left unset, they fall back to Material’s
+    // baseline purple, which is both off-palette and only ≈ 1.9:1 against the
+    // background, short of the 3:1 a control has to clear.
+    primaryContainer = Color(0xFFEBEBEB),
+    onPrimaryContainer = Color(0xFF000000),
     secondary = Color(0xFF333333),          // Dark gray (matching web secondary)
     onSecondary = Color.White,               // White text on secondary
-    secondaryContainer = Color(0xFF333333), // Neutral card (countdown)
+    secondaryContainer = Color(0xFF333333), // Tonal buttons (the disable durations)
     onSecondaryContainer = Color(0xFFFBFBFB), // Light text (contrast ≈ 12:1)
-    tertiary = Color(0xFF15803D),           // Green-700 (contrast with white ≈ 5:1)
+    // Green-700 (contrast with white ≈ 5:1). No longer drawn directly—[Brand]
+    // carries the protection-active signal now—but kept as the accent the
+    // container below pairs with, and for any Material component reaching for it.
+    tertiary = Color(0xFF15803D),
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFF14532D),  // Green-900 card (empty state, battery prompt)
     onTertiaryContainer = Color(0xFFFBFBFB), // Light text (contrast ≈ 9:1)
@@ -76,10 +101,13 @@ fun awagamSwitchColors(): SwitchColors = SwitchDefaults.colors(
 )
 
 /**
- * Switch colors for the main protection toggle, green when on to match its label.
+ * Switch colors for the main protection toggle, carrying [Brand] when on to
+ * match its label. A filled track with a dark thumb, rather than the tinted
+ * track and matching thumb of before: those differed by only 2.85:1 from each
+ * other, so the control read as one shape whichever way it was set.
  */
 @Composable
 fun protectionSwitchColors(): SwitchColors = awagamSwitchColors().copy(
-    checkedThumbColor = MaterialTheme.colorScheme.tertiary,
-    checkedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
+    checkedThumbColor = OnBrand,
+    checkedTrackColor = Brand
 )
