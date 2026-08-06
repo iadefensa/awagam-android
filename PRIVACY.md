@@ -1,6 +1,6 @@
 # AWAGAM Android Privacy Policy
 
-Last updated: August 3, 2026
+Last updated: August 6, 2026
 
 ## Summary
 
@@ -17,12 +17,20 @@ AWAGAM creates a local VPN to filter DNS queries. When you visit a website, your
 | Data | Purpose | Location |
 | --- | --- | --- |
 | Enabled/disabled state | Remember your preference | App preferences |
+| Selected DNS provider | Forward queries to your choice of resolver | App preferences |
 | Blocklist URLs you add | Fetch blocklists | App preferences |
 | Cached blocklist content | Offline filtering | App storage |
 | Temporary disable timer | Resume after timeout | App preferences |
+| Auto-start setting | Resume protection after a restart | App preferences |
 | DNS query statistics | Display in Statistics screen | App storage |
 
 All data is stored locally. Nothing is synced to external servers.
+
+### No Backup or Transfer
+
+The app opts out of Android’s backup and transfer system. None of the above is copied into your Google account, and none of it is carried over by a device-to-device transfer when you set up a new phone.
+
+This is deliberate. Which blocklists you subscribe to says a great deal about you, and that is not ours to place in anyone’s cloud storage. The trade is that a new device starts empty: use `Export config` under Settings to move your setup yourself, to a destination you choose.
 
 ### Network Connections
 
@@ -64,7 +72,7 @@ The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution. Their p
 ## Your Rights
 
 * All data is under your control
-* Uninstalling the app removes all stored data
+* Uninstalling the app removes all stored data, and leaves no backup behind
 * You can export your configuration at any time
 
 ## Open Source

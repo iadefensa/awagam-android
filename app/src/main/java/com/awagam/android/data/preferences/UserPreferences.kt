@@ -30,11 +30,6 @@ class UserPreferences(private val context: Context) {
         private val VPN_ERROR = stringPreferencesKey("vpn_error")
         private val BATTERY_PROMPT_DISMISSED = booleanPreferencesKey("battery_prompt_dismissed")
 
-        const val DNS_DNS4EU = "https://protective.joindns4.eu/dns-query"
-        const val DNS_CLOUDFLARE = "https://cloudflare-dns.com/dns-query"
-        const val DNS_GOOGLE = "https://dns.google/dns-query"
-        const val DNS_QUAD9 = "https://dns.quad9.net/dns-query"
-
         const val VPN_ERROR_ANOTHER_VPN = "another_vpn_active"
         const val VPN_ERROR_DOH_FAILED = "doh_failed"
         const val VPN_ERROR_GENERAL = "general_error"
@@ -54,7 +49,7 @@ class UserPreferences(private val context: Context) {
 
     val upstreamDnsFlow: Flow<String> = context.dataStore.data
         .map { preferences ->
-            preferences[UPSTREAM_DNS] ?: DNS_DNS4EU
+            preferences[UPSTREAM_DNS] ?: DnsProviders.DEFAULT.url
         }
 
     val disableUntilFlow: Flow<Long> = context.dataStore.data

@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,6 +71,7 @@ import android.provider.Settings
 import java.text.NumberFormat
 import com.awagam.android.R
 import com.awagam.android.data.preferences.UserPreferences
+import com.awagam.android.ui.theme.Brand
 import com.awagam.android.ui.theme.WarningContainer
 import com.awagam.android.ui.theme.protectionSwitchColors
 import com.awagam.android.ui.viewmodel.HomeViewModel
@@ -118,9 +121,27 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
+                    // The launcher label stays “AWAGAM” (`app_name`), where space
+                    // is tight; in the app there is usually room to name the maker.
+                    // “Usually”: The full name needs about 208 dp, which a narrow
+                    // screen or a raised font scale can undercut. Rather than pick
+                    // a dp breakpoint—font scale and display size move that line
+                    // independently—let the layout report the overflow and drop to
+                    // the short name, which fits at any size. Keyed to the
+                    // configuration so a rotation or a settings change re-measures.
+                    val configuration = LocalConfiguration.current
+                    var useShortTitle by remember(configuration) { mutableStateOf(false) }
                     Text(
-                        text = "AWAGAM",
-                        fontWeight = FontWeight.Bold
+                        text = if (useShortTitle) "AWAGAM" else "IA Defensa AWAGAM",
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        // Only ever set, never cleared, so the two names cannot
+                        // oscillate; the ellipsis is a backstop for the short one
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { result ->
+                            if (!useShortTitle && result.hasVisualOverflow) useShortTitle = true
+                        }
                     )
                 },
                 actions = {
@@ -169,7 +190,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isActive) {
-                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
+                        Brand.copy(alpha = 0.1f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
                     }
@@ -209,7 +230,9 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = if (isActive) {
-                                MaterialTheme.colorScheme.tertiary
+                                // `Brand`, not a scheme color: the one place
+                                // the app shows its accent
+                                Brand
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -477,7 +500,8 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "AWAGAM creates a local VPN to intercept DNS queries. Blocked domains resolve to 0.0.0.0, preventing connections. Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered. No data is sent to external servers.",
+                        text = "AWAGAM creates a local VPN to intercept DNS queries. Blocked domains resolve to 0.0.0.0, preventing connections. Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered.\n\n" +
+                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that your blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -546,7 +570,8 @@ private fun CountdownCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            // The card grey the rest of the screen uses
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
@@ -558,13 +583,14 @@ private fun CountdownCard(
             Text(
                 text = "Re-enabling in",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = timeString,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                // Brighter than the label: The number is what the card is for
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = onCancel) {
@@ -624,7 +650,7 @@ private fun VpnErrorCard(
             "Protection did not start in time. Another VPN may be holding the connection, or the blocklists may be too large to load. Try again."
         isDoHError -> {
             val detail = error.removePrefix("${UserPreferences.VPN_ERROR_DOH_FAILED}:")
-            "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection or try a different DNS provider in your system settings."
+            "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection, or pick a different DNS provider in the settings."
         }
         else ->
             "Could not start protection. Please try again."

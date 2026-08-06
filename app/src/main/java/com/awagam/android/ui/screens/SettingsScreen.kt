@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -74,6 +79,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
+import com.awagam.android.data.preferences.DnsProvider
+import com.awagam.android.data.preferences.DnsProviders
+import com.awagam.android.ui.theme.Brand
+import com.awagam.android.ui.theme.ErrorText
+import com.awagam.android.ui.theme.OnBrand
 import com.awagam.android.ui.theme.Warning
 import com.awagam.android.ui.theme.awagamSwitchColors
 import com.awagam.android.ui.viewmodel.SettingsViewModel
@@ -97,6 +107,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
+    var showDnsProviderDialog by remember { mutableStateOf(false) }
     // Remembered so the export dialog can share the same format it is showing
     var exportFormat by remember { mutableStateOf<BlocklistExporter.Format?>(null) }
     var editingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
@@ -172,7 +183,13 @@ fun SettingsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            // Carries the brand color: The app ships with no rules, so adding a
+            // blocklist is the one action a new install depends on
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = Brand,
+                contentColor = OnBrand
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add blocklist")
             }
         }
@@ -356,6 +373,50 @@ fun SettingsScreen(
 
             item {
                 SectionHeader(
+                    title = "DNS Provider",
+                    description = "Where queries go that your blocklists don’t block. " +
+                        "Sent over DNS-over-HTTPS, so the network in between can’t read them."
+                )
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDnsProviderDialog = true }
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = uiState.upstreamDns.name,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = uiState.upstreamDns.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Change",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            item {
+                SectionHeader(
                     title = "Start on Boot",
                     description = "Needs VPN permission to have been granted once."
                 )
@@ -424,6 +485,18 @@ fun SettingsScreen(
             onSave = { name, url ->
                 viewModel.editBlocklist(blocklist.id, name, url)
                 editingBlocklist = null
+            }
+        )
+    }
+
+    // DNS provider selection dialog
+    if (showDnsProviderDialog) {
+        DnsProviderDialog(
+            selected = uiState.upstreamDns,
+            onDismiss = { showDnsProviderDialog = false },
+            onSelect = { provider ->
+                viewModel.setUpstreamDns(provider)
+                showDnsProviderDialog = false
             }
         )
     }
@@ -562,7 +635,7 @@ private fun BlocklistCard(
                     text = blocklist.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     // “warning” means active with skipped bundle imports—not an error
-                    color = if (blocklist.status == "warning") Warning else MaterialTheme.colorScheme.error,
+                    color = if (blocklist.status == "warning") Warning else ErrorText,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -601,7 +674,7 @@ private fun BlocklistCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = ErrorText
                     )
                 }
             }
@@ -758,6 +831,65 @@ private fun ImportExportDialog(
                 TextButton(onClick = onDismiss) {
                     Text("Cancel")
                 }
+            }
+        }
+    )
+}
+
+/**
+ * Pick the upstream resolver. Scrollable because the list outgrows a dialog on
+ * smaller screens, and selecting closes it—there is nothing to confirm.
+ */
+@Composable
+private fun DnsProviderDialog(
+    selected: DnsProvider,
+    onDismiss: () -> Unit,
+    onSelect: (DnsProvider) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("DNS Provider") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                DnsProviders.ALL.forEach { provider ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Selects the row rather than the button alone, and
+                            // pairs the labels with it for TalkBack
+                            .selectable(
+                                selected = provider == selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(provider) }
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = provider == selected,
+                            onClick = null
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = provider.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = provider.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )
