@@ -374,7 +374,7 @@ fun SettingsScreen(
             item {
                 SectionHeader(
                     title = "DNS Provider",
-                    description = "Where queries go that your blocklists don’t block. " +
+                    description = "Where queries go that blocklists don’t block. " +
                         "Sent over DNS-over-HTTPS, so the network in between can’t read them."
                 )
             }
@@ -397,7 +397,8 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = uiState.upstreamDns.name,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
                             )
                             Text(
                                 text = uiState.upstreamDns.description,
