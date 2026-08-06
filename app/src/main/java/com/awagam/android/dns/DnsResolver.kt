@@ -342,8 +342,10 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     /**
      * Test DoH connectivity by sending a query for example.com.
      * Returns null on success, or an error description on failure.
+     * `url` defaults to the current upstream, but a probe that spans retries
+     * passes the one it started against, so its verdict covers a single resolver.
      */
-    fun testUpstreamConnectivity(): String? {
+    fun testUpstreamConnectivity(url: String = upstreamDnsUrl): String? {
         return try {
             val query = Message(0)
             val name = org.xbill.DNS.Name.fromString("example.com.")
@@ -355,7 +357,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
 
             val dnsPayload = query.toWire()
             val request = Request.Builder()
-                .url(upstreamDnsUrl)
+                .url(url)
                 .post(dnsPayload.toRequestBody(DOH_CONTENT_TYPE.toMediaType()))
                 .header("Accept", DOH_CONTENT_TYPE)
                 .build()
@@ -375,21 +377,53 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     }
 
     /**
+     * What a probe found.
+     * `Stale` keeps a verdict about a resolver switched away from mid-probe out
+     * of the UI: it describes an upstream no longer in use, and whoever switched
+     * probes the new one themselves.
+     */
+    sealed interface ProbeResult {
+        object Reachable : ProbeResult
+        data class Unreachable(val detail: String) : ProbeResult
+        object Stale : ProbeResult
+    }
+
+    /**
+     * The upstream together with the generation it belongs to, read under the
+     * switch lock so the pair can’t straddle a switch.
+     */
+    @Synchronized
+    private fun currentUpstream(): Pair<String, Int> = upstreamDnsUrl to resolverGeneration
+
+    /**
      * Probe the upstream, retrying before it counts as unreachable.
-     * Returns the last error, or null as soon as one attempt gets through.
      * A single failure says little—the tunnel may still be settling, or the
      * network may have blinked—so callers decide how much patience the moment
      * warrants through `attempts` and `retryDelayMs`.
      */
-    suspend fun probeUpstream(attempts: Int, retryDelayMs: Long): String? =
+    suspend fun probeUpstream(attempts: Int, retryDelayMs: Long): ProbeResult =
         withContext(Dispatchers.IO) {
+            // Pinned for the whole run: Reading the field per attempt would let a
+            // switch spread one verdict across two resolvers, and report the
+            // second one’s failure against the first one’s name
+            val (url, generation) = currentUpstream()
             var lastError: String? = null
             repeat(attempts) { attempt ->
                 if (attempt > 0) delay(retryDelayMs)
-                lastError = testUpstreamConnectivity() ?: return@withContext null
-                Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $lastError")
+                // A switch makes the rest of the run moot, so stop rather than
+                // spend the remaining timeouts on it
+                if (generation != resolverGeneration) return@withContext ProbeResult.Stale
+                val error = testUpstreamConnectivity(url)
+                    ?: return@withContext ProbeResult.Reachable
+                Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $error")
+                lastError = error
             }
-            lastError
+            // Once more, since the last attempt could have been overtaken while
+            // it was waiting on its own timeout
+            if (generation != resolverGeneration) return@withContext ProbeResult.Stale
+            // Nothing reported a failure only when there were no attempts to make;
+            // silence is the safe reading, a warning nobody probed for is not
+            lastError?.let { ProbeResult.Unreachable(it) } ?: ProbeResult.Reachable
         }
 
     /**

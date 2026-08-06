@@ -16,6 +16,7 @@ import com.awagam.android.data.preferences.DnsProvider
 import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
+import com.awagam.android.dns.DnsResolver
 import com.awagam.android.vpn.AWAGAMVpnService
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -140,21 +141,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             // the probe would not take the route real queries do
             if (!AWAGAMVpnService.isServiceRunning) return@launch
 
-            val error = resolver.probeUpstream(
+            val result = resolver.probeUpstream(
                 SWITCH_PROBE_ATTEMPTS,
                 SWITCH_PROBE_RETRY_DELAY_MS
             )
-            if (error != null) {
-                AWAGAMVpnService.reportDohFailure(userPreferences, error)
-                _uiState.update {
-                    it.copy(
-                        // Cleared so the snackbar shows this rather than the
-                        // confirmation it supersedes
-                        successMessage = null,
-                        error = "${provider.name} is not reachable ($error). " +
-                            "Queries will fail until it responds, or until you pick another provider."
-                    )
-                }
+            // A `Stale` result belongs to a provider since switched away from,
+            // and the switch that replaced it reports its own outcome—reporting
+            // this one would name the wrong provider, and resurrect a warning
+            // that switch just cleared
+            if (result !is DnsResolver.ProbeResult.Unreachable) return@launch
+
+            AWAGAMVpnService.reportDohFailure(userPreferences, result.detail)
+            _uiState.update {
+                it.copy(
+                    // Cleared so the snackbar shows this rather than the
+                    // confirmation it supersedes
+                    successMessage = null,
+                    error = "${provider.name} is not reachable (${result.detail}). " +
+                        "Queries will fail until it responds, or until you pick another provider."
+                )
             }
         }
     }

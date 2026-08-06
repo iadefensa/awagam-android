@@ -111,6 +111,21 @@ class UserPreferences(private val context: Context) {
         setVpnError(null)
     }
 
+    /**
+     * Clear the stored error only when it is a DoH failure, leaving a start
+     * failure—another VPN holding the connection, a denied permission—for the
+     * user to act on: Switching DNS provider says nothing about those.
+     * Read and removed in one edit, so an error stored in between is not taken
+     * for the one this was called to retract.
+     */
+    suspend fun clearDohVpnError() {
+        context.dataStore.edit { preferences ->
+            if (preferences[VPN_ERROR]?.startsWith(VPN_ERROR_DOH_FAILED) == true) {
+                preferences.remove(VPN_ERROR)
+            }
+        }
+    }
+
     suspend fun setBatteryPromptDismissed(dismissed: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[BATTERY_PROMPT_DISMISSED] = dismissed

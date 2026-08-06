@@ -105,7 +105,7 @@ class AWAGAMVpnService : VpnService() {
          */
         suspend fun clearDohFailure(userPreferences: UserPreferences) {
             dohErrorReported = false
-            userPreferences.clearVpnError()
+            userPreferences.clearDohVpnError()
         }
 
         // For work that has to finish after the service is destroyed
@@ -245,13 +245,20 @@ class AWAGAMVpnService : VpnService() {
 
                     // Test DoH connectivity in the background and warn the user if it fails
                     launch(Dispatchers.IO) {
-                        val error = dnsResolver.probeUpstream(
+                        val result = dnsResolver.probeUpstream(
                             DOH_PROBE_ATTEMPTS,
                             DOH_PROBE_RETRY_DELAY_MS
                         )
-                        if (error != null) {
-                            Log.e(TAG, "DoH connectivity test failed: $error")
-                            reportDohFailure(userPreferences, error)
+                        when (result) {
+                            is DnsResolver.ProbeResult.Unreachable -> {
+                                Log.e(TAG, "DoH connectivity test failed: ${result.detail}")
+                                reportDohFailure(userPreferences, result.detail)
+                            }
+                            // Settings switched upstreams while this ran, and
+                            // probes the new one itself
+                            DnsResolver.ProbeResult.Stale ->
+                                Log.d(TAG, "Discarding probe of a replaced upstream")
+                            DnsResolver.ProbeResult.Reachable -> {}
                         }
                     }
                 } else {
