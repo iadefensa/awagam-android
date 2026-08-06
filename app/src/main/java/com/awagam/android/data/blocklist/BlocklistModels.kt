@@ -84,8 +84,15 @@ data class ExternalBlocklistConfig(
 fun ExternalBlocklistConfig.deletionImpact(): String? {
     val imports = metadata?.importsLoaded ?: 0
     if (imports <= 0) return null
-    return "This is a bundle, and $imports imported blocklist(s) go with it. " +
-        "Their URLs are not listed here, so adding them back means going through the bundle again."
+    // Spelled out rather than the “blocklist(s)” the snackbars use: Those read
+    // as a count alone, this one has to agree with a verb
+    return if (imports == 1) {
+        "This is a bundle, and 1 imported blocklist goes with it. " +
+            "Its URL is not listed here, so adding it back means going through the bundle again."
+    } else {
+        "This is a bundle, and $imports imported blocklists go with it. " +
+            "Their URLs are not listed here, so adding them back means going through the bundle again."
+    }
 }
 
 /**

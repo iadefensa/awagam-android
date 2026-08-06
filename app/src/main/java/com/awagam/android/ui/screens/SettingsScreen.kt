@@ -247,21 +247,12 @@ fun SettingsScreen(
                                 }
                             }
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append(". If you’re using a VPN and this app can’t be enabled, you can export blocklists to use with apps like Pi-hole or AdGuard.")
-                            }
-                        }
-                        Text(
-                            text = mainText,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        val noteText = buildAnnotatedString {
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append(". If you’re using a VPN and this app can’t be enabled, you can export blocklists to use with apps like Pi-hole or AdGuard.\n\n")
                                 append("Note: URL patterns (like “example.com/path/*”) are only supported in the AWAGAM browser extension. If part of a blocklist, they will be passed on in config and exports.")
                             }
                         }
                         Text(
-                            text = noteText,
+                            text = mainText,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

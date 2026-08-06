@@ -414,13 +414,15 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                 // spend the remaining timeouts on it
                 if (generation != resolverGeneration) return@withContext ProbeResult.Stale
                 val error = testUpstreamConnectivity(url)
-                    ?: return@withContext ProbeResult.Reachable
+                // The request is where the time goes, so a switch is likeliest to
+                // land inside it. Checked before the answer is used either way: A
+                // reachable verdict about the resolver just left behind would say
+                // nothing about the one now in place.
+                if (generation != resolverGeneration) return@withContext ProbeResult.Stale
+                if (error == null) return@withContext ProbeResult.Reachable
                 Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $error")
                 lastError = error
             }
-            // Once more, since the last attempt could have been overtaken while
-            // it was waiting on its own timeout
-            if (generation != resolverGeneration) return@withContext ProbeResult.Stale
             // Nothing reported a failure only when there were no attempts to make;
             // silence is the safe reading, a warning nobody probed for is not
             lastError?.let { ProbeResult.Unreachable(it) } ?: ProbeResult.Reachable

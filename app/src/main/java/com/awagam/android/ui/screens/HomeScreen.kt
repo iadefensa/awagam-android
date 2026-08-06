@@ -450,14 +450,12 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "DNS only sees domain names, not full URLs. Patterns like “example.com/path/*” cannot be blocked at the DNS level.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // One `Text` with a blank line between the paragraphs, as the
+                    // cards without links do: A spacer between two `Text`s would
+                    // set the gap in dp against their 16.sp line
                     val annotatedText = buildAnnotatedString {
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                            append("DNS only sees domain names, not full URLs. Patterns like “example.com/path/*” cannot be blocked at the DNS level.\n\n")
                             append("For URL-level blocking, use ")
                         }
                         withLink(LinkAnnotation.Url(

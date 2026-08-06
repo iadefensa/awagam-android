@@ -70,6 +70,27 @@ class BlocklistDeletionTest {
             "The warning must count the lists actually in effect, not those declared: $impact",
             impact!!.contains("3")
         )
+        assertTrue(
+            "Several lists take the plural: $impact",
+            impact.contains("blocklists go with it")
+        )
+    }
+
+    @Test
+    fun `a bundle importing one list warns in the singular`() {
+        val impact = config(
+            metadata = BlocklistMetadata(imports = 1, importsLoaded = 1)
+        ).deletionImpact()
+
+        assertNotNull("One imported list is still more than the entry itself", impact)
+        assertTrue(
+            "A single list takes the singular, and the verb has to agree: $impact",
+            impact!!.contains("1 imported blocklist goes with it")
+        )
+        assertTrue(
+            "Its URL is one URL: $impact",
+            impact.contains("Its URL is not listed here")
+        )
     }
 
     @Test
