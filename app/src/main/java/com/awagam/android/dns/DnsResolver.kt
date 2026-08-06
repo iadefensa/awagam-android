@@ -246,6 +246,13 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     // from a different thread than the one resolving queries.
     @Volatile
     private var upstreamDnsUrl = DnsProviders.DEFAULT.url
+
+    // Bumped on every upstream switch, so a query already in flight can tell that
+    // its answer predates the switch. Written under the instance lock, read
+    // outside it, hence volatile.
+    @Volatile
+    private var resolverGeneration = 0
+
     private val dnsCache = DnsCache()
     private var statisticsManager: StatisticsManager? = null
     private var protectedSocketFactory: SocketFactory? = null
@@ -313,6 +320,22 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
 
     fun setUpstreamDns(url: String) {
         upstreamDnsUrl = url
+    }
+
+    /**
+     * Switch the upstream resolver and drop everything the previous one answered.
+     * The three steps are one operation against `acceptUpstreamResponse`, which
+     * caches under the same lock: a query still in flight when the switch happens
+     * carries the old generation and is kept out of the cache, rather than
+     * refilling it right after the clear with an answer the new resolver may
+     * filter differently.
+     */
+    @Synchronized
+    fun switchUpstreamDns(url: String) {
+        upstreamDnsUrl = url
+        resolverGeneration++
+        dnsCache.clear()
+        Log.d(TAG, "Upstream switched, DNS cache cleared")
     }
 
     /**
@@ -395,9 +418,11 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                 } else {
                     Log.d(TAG, "Cache miss: $hostname")
                     statisticsManager?.recordCacheMiss()
-                    // Forward to upstream DoH server
+                    // Forward to upstream DoH server, noting which resolver the
+                    // query is going out to
+                    val generation = resolverGeneration
                     val upstreamResponse = forwardToUpstream(dnsPayload)?.let {
-                        acceptUpstreamResponse(query, it)
+                        acceptUpstreamResponse(query, it, generation)
                     }
                     if (upstreamResponse != null) {
                         upstreamResponse
@@ -453,9 +478,15 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     /**
      * Check an upstream response against the query before it is handed to the
      * client or cached, and cache it when it is worth caching.
+     * `generation` is the one the query was sent under; an answer from a resolver
+     * since switched away from is still served, but not cached.
      * Returns the response to send back, or null to fail the query.
      */
-    internal fun acceptUpstreamResponse(query: Message, response: ByteArray): ByteArray? {
+    internal fun acceptUpstreamResponse(
+        query: Message,
+        response: ByteArray,
+        generation: Int = resolverGeneration
+    ): ByteArray? {
         val responseMessage = try {
             Message(response)
         } catch (e: Exception) {
@@ -482,7 +513,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         val cacheable = !responseMessage.header.getFlag(Flags.TC.toInt()) &&
                 (rcode == Rcode.NOERROR || rcode == Rcode.NXDOMAIN)
         if (cacheable) {
-            dnsCache.put(query, responseMessage, response)
+            cacheIfCurrent(generation, query, responseMessage, response)
         }
 
         // The transaction ID is what the client matches on, so make sure it is
@@ -497,6 +528,25 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         patched[0] = ((queryId shr 8) and 0xFF).toByte()
         patched[1] = (queryId and 0xFF).toByte()
         return patched
+    }
+
+    /**
+     * Cache the response unless the upstream was switched while it was in flight.
+     * Synchronized on the same lock as `switchUpstreamDns`, so the check and the
+     * write can’t straddle that switch’s cache clear.
+     */
+    @Synchronized
+    private fun cacheIfCurrent(
+        generation: Int,
+        query: Message,
+        responseMessage: Message,
+        response: ByteArray
+    ) {
+        if (generation != resolverGeneration) {
+            Log.d(TAG, "Not caching an answer from the previous upstream")
+            return
+        }
+        dnsCache.put(query, responseMessage, response)
     }
 
     /**
