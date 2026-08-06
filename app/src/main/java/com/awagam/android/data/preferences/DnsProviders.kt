@@ -44,7 +44,7 @@ object DnsProviders {
         ),
         DnsProvider(
             name = "DNS4EU Unfiltered",
-            description = "No filtering of its own—your blocklists alone decide",
+            description = "No filtering of its own—blocklists alone decide",
             url = "https://unfiltered.joindns4.eu/dns-query"
         ),
         DnsProvider(

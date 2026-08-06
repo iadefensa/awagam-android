@@ -501,7 +501,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "AWAGAM creates a local VPN to intercept DNS queries. Blocked domains resolve to 0.0.0.0, preventing connections. Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered.\n\n" +
-                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that your blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
+                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

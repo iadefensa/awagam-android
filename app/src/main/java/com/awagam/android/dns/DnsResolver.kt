@@ -8,6 +8,7 @@ import com.awagam.android.data.blocklist.BlocklistRepository
 import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.statistics.StatisticsManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
@@ -372,6 +373,24 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
             e.message ?: e.javaClass.simpleName
         }
     }
+
+    /**
+     * Probe the upstream, retrying before it counts as unreachable.
+     * Returns the last error, or null as soon as one attempt gets through.
+     * A single failure says little—the tunnel may still be settling, or the
+     * network may have blinked—so callers decide how much patience the moment
+     * warrants through `attempts` and `retryDelayMs`.
+     */
+    suspend fun probeUpstream(attempts: Int, retryDelayMs: Long): String? =
+        withContext(Dispatchers.IO) {
+            var lastError: String? = null
+            repeat(attempts) { attempt ->
+                if (attempt > 0) delay(retryDelayMs)
+                lastError = testUpstreamConnectivity() ?: return@withContext null
+                Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $lastError")
+            }
+            lastError
+        }
 
     /**
      * Resolve a DNS query packet.
