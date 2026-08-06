@@ -76,6 +76,19 @@ data class ExternalBlocklistConfig(
 )
 
 /**
+ * What deleting this blocklist takes with it beyond the entry itself, or null
+ * when the entry is all there is to lose.
+ * A bundle stands for the lists it imports, and their URLs appear nowhere in
+ * the UI—the count is the only warning that more than one source is going.
+ */
+fun ExternalBlocklistConfig.deletionImpact(): String? {
+    val imports = metadata?.importsLoaded ?: 0
+    if (imports <= 0) return null
+    return "This is a bundle, and $imports imported blocklist(s) go with it. " +
+        "Their URLs are not listed here, so adding them back means going through the bundle again."
+}
+
+/**
  * Export format matching browser extension.
  */
 @Serializable

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -79,6 +80,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.awagam.android.data.blocklist.BLOCKLIST_REFRESH_INTERVAL_MS
 import com.awagam.android.data.blocklist.BlocklistExporter
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
+import com.awagam.android.data.blocklist.deletionImpact
 import com.awagam.android.data.preferences.DnsProvider
 import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.ui.theme.Brand
@@ -111,6 +113,7 @@ fun SettingsScreen(
     // Remembered so the export dialog can share the same format it is showing
     var exportFormat by remember { mutableStateOf<BlocklistExporter.Format?>(null) }
     var editingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
+    var deletingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -231,17 +234,7 @@ fun SettingsScreen(
                                 }
                             }
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append(". You can import configs from and export configs to the AWAGAM browser extension. If you’re using a VPN and this app can’t be enabled, you can export blocklists to use with apps like Pi-hole or AdGuard.")
-                            }
-                        }
-                        Text(
-                            text = mainText,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        val noteText = buildAnnotatedString {
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append("Note: URL patterns (like “example.com/path/*”) are only supported in ")
+                                append(". You can import configs from and export configs to ")
                             }
                             withLink(LinkAnnotation.Url(
                                 url = "https://chromewebstore.google.com/detail/ia-defensa-awagam-tld-dom/efnpgpiffjglnijemnmdkemiliiialbm"
@@ -254,7 +247,17 @@ fun SettingsScreen(
                                 }
                             }
                             withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                                append(". If part of a blocklist, they will be passed on in config and exports.")
+                                append(". If you’re using a VPN and this app can’t be enabled, you can export blocklists to use with apps like Pi-hole or AdGuard.")
+                            }
+                        }
+                        Text(
+                            text = mainText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val noteText = buildAnnotatedString {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                                append("Note: URL patterns (like “example.com/path/*”) are only supported in the AWAGAM browser extension. If part of a blocklist, they will be passed on in config and exports.")
                             }
                         }
                         Text(
@@ -367,7 +370,7 @@ fun SettingsScreen(
                     onToggle = { viewModel.toggleBlocklist(blocklist.id) },
                     onRefresh = { viewModel.refreshBlocklist(blocklist.id) },
                     onEdit = { editingBlocklist = blocklist },
-                    onDelete = { viewModel.deleteBlocklist(blocklist.id) }
+                    onDelete = { deletingBlocklist = blocklist }
                 )
             }
 
@@ -486,6 +489,18 @@ fun SettingsScreen(
             onSave = { name, url ->
                 viewModel.editBlocklist(blocklist.id, name, url)
                 editingBlocklist = null
+            }
+        )
+    }
+
+    // Delete blocklist confirmation
+    deletingBlocklist?.let { blocklist ->
+        DeleteBlocklistDialog(
+            blocklist = blocklist,
+            onDismiss = { deletingBlocklist = null },
+            onConfirm = {
+                viewModel.deleteBlocklist(blocklist.id)
+                deletingBlocklist = null
             }
         )
     }
@@ -773,6 +788,65 @@ private fun EditBlocklistDialog(
                     && (name != blocklist.name || url != blocklist.url)
             ) {
                 Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+/**
+ * Confirm a deletion, which nothing takes back: The entry is removed from the
+ * store and its cache dropped, so what is shown here is what it costs to undo
+ * by hand.
+ */
+@Composable
+private fun DeleteBlocklistDialog(
+    blocklist: ExternalBlocklistConfig,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Blocklist") },
+        text = {
+            Column {
+                Text(
+                    text = "“${blocklist.name}” will stop blocking what it covers.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                // Adding the list back takes its URL, and once the entry is gone
+                // the app holds it nowhere else
+                Text(
+                    text = blocklist.url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                blocklist.deletionImpact()?.let { impact ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = impact,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Warning
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                // The pairing the error cards use, rather than the primary every
+                // other confirm here carries: This one does not undo
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Text("Delete")
             }
         },
         dismissButton = {
