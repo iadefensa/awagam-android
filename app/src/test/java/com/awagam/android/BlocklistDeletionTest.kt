@@ -60,18 +60,14 @@ class BlocklistDeletionTest {
         Dispatchers.setMain(testDispatcher)
         app = ApplicationProvider.getApplicationContext()
         DependencyContainer.initialize(app)
-
-        // The blocklist store is one process-wide DataStore shared by every test
-        // in the JVM, and other classes write to it. Without this, what they left
-        // behind decides whether the count this test waits for is ever reached.
-        runBlocking {
-            val manager = ExternalBlocklistManager(app)
-            manager.blocklistsFlow.first().forEach { manager.deleteBlocklist(it.id) }
-        }
+        clearStoredBlocklists(app)
     }
 
     @After
     fun tearDown() {
+        // Before the dispatcher goes back, so the clear runs against the setup
+        // this test has been using all along
+        clearStoredBlocklists(app)
         Dispatchers.resetMain()
         DependencyContainer.clear()
     }
