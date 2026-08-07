@@ -811,11 +811,15 @@ private fun DeleteBlocklistDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 // Adding the list back takes its URL, and once the entry is gone
-                // the app holds it nowhere else
+                // the app holds it nowhere else. Capped like the card’s error
+                // text: A long URL breaks anywhere, so left free it would push
+                // the buttons off a short screen
                 Text(
                     text = blocklist.url,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
                 blocklist.deletionImpact()?.let { impact ->
                     Spacer(modifier = Modifier.height(8.dp))
