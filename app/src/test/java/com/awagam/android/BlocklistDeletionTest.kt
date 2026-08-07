@@ -60,6 +60,14 @@ class BlocklistDeletionTest {
         Dispatchers.setMain(testDispatcher)
         app = ApplicationProvider.getApplicationContext()
         DependencyContainer.initialize(app)
+
+        // The blocklist store is one process-wide DataStore shared by every test
+        // in the JVM, and other classes write to it. Without this, what they left
+        // behind decides whether the count this test waits for is ever reached.
+        runBlocking {
+            val manager = ExternalBlocklistManager(app)
+            manager.blocklistsFlow.first().forEach { manager.deleteBlocklist(it.id) }
+        }
     }
 
     @After
@@ -125,8 +133,8 @@ class BlocklistDeletionTest {
             impact!!.contains("1 imported blocklist goes with it")
         )
         assertTrue(
-            "Its URL is one URL: $impact",
-            impact.contains("Its URL is not listed here")
+            "The URL shown above it is the bundle’s, and the warning must say so: $impact",
+            impact.contains("not to that blocklist")
         )
     }
 
