@@ -80,6 +80,8 @@ data class ExternalBlocklistConfig(
  * when the entry is all there is to lose.
  * A bundle stands for the lists it imports, and their URLs appear nowhere in
  * the UI—the count is the only warning that more than one source is going.
+ * Written for the delete confirmation, which shows the bundle’s own URL just
+ * above, so the wording says which URL it means.
  */
 fun ExternalBlocklistConfig.deletionImpact(): String? {
     val imports = metadata?.importsLoaded ?: 0
@@ -88,10 +90,12 @@ fun ExternalBlocklistConfig.deletionImpact(): String? {
     // as a count alone, this one has to agree with a verb
     return if (imports == 1) {
         "This is a bundle, and 1 imported blocklist goes with it. " +
-            "Its URL is not listed here, so adding it back means going through the bundle again."
+            "The URL above points to the bundle, not to that blocklist, " +
+            "so adding it back means going through the bundle again."
     } else {
         "This is a bundle, and $imports imported blocklists go with it. " +
-            "Their URLs are not listed here, so adding them back means going through the bundle again."
+            "The URL above points to the bundle, not to those blocklists, " +
+            "so adding them back means going through the bundle again."
     }
 }
 
