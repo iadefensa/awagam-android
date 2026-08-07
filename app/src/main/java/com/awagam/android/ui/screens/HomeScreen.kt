@@ -450,14 +450,12 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "DNS only sees domain names, not full URLs. Patterns like “example.com/path/*” cannot be blocked at the DNS level.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // One `Text` with a blank line between the paragraphs, as the
+                    // cards without links do: A spacer between two `Text`s would
+                    // set the gap in dp against their 16.sp line
                     val annotatedText = buildAnnotatedString {
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                            append("DNS only sees domain names, not full URLs. Patterns like “example.com/path/*” cannot be blocked at the DNS level.\n\n")
                             append("For URL-level blocking, use ")
                         }
                         withLink(LinkAnnotation.Url(
@@ -501,7 +499,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "AWAGAM creates a local VPN to intercept DNS queries. Blocked domains resolve to 0.0.0.0, preventing connections. Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered.\n\n" +
-                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that your blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
+                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

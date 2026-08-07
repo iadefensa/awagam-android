@@ -79,17 +79,41 @@ class AWAGAMVpnService : VpnService() {
         var pendingStop = false
             private set
 
+        // Set when a DoH failure has been reported, so the first query that
+        // actually succeeds can retract a warning the user would otherwise be
+        // stuck with. Companion-level because the settings screen reports
+        // failures too, after a provider switch, and the retraction below is
+        // the only thing that takes those back.
+        @Volatile
+        private var dohErrorReported = false
+
+        /**
+         * Warn the user that the upstream is unreachable, from the startup probe
+         * or from a provider switch. Pairs the preference write with the flag
+         * that lets the next successful query retract it: Setting the preference
+         * alone would leave a warning nothing can clear.
+         */
+        suspend fun reportDohFailure(userPreferences: UserPreferences, detail: String) {
+            dohErrorReported = true
+            userPreferences.setVpnError("${UserPreferences.VPN_ERROR_DOH_FAILED}:$detail")
+        }
+
+        /**
+         * Take back a DoH warning, for a switch away from the upstream that
+         * caused it: The new one has not been probed yet, so the old failure no
+         * longer describes anything.
+         */
+        suspend fun clearDohFailure(userPreferences: UserPreferences) {
+            dohErrorReported = false
+            userPreferences.clearDohVpnError()
+        }
+
         // For work that has to finish after the service is destroyed
         private val shutdownScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var isRunning = false
-
-    // Set when the startup probe reported a DoH failure, so the first query that
-    // actually succeeds can retract a warning the user would otherwise be stuck with
-    @Volatile
-    private var dohErrorReported = false
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var startupJob: Job? = null
@@ -112,20 +136,6 @@ class AWAGAMVpnService : VpnService() {
         userPreferences = DependencyContainer.getUserPreferences()
         dnsResolver = DependencyContainer.getDnsResolver()
         statisticsManager = DependencyContainer.getStatisticsManager()
-    }
-
-    /**
-     * Probe the DoH upstream, retrying before it counts as unreachable.
-     * Returns the last error, or null as soon as one attempt gets through.
-     */
-    private suspend fun probeUpstream(): String? {
-        var lastError: String? = null
-        repeat(DOH_PROBE_ATTEMPTS) { attempt ->
-            if (attempt > 0) delay(DOH_PROBE_RETRY_DELAY_MS)
-            lastError = dnsResolver.testUpstreamConnectivity() ?: return null
-            Log.d(TAG, "DoH probe attempt ${attempt + 1} failed: $lastError")
-        }
-        return lastError
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -235,13 +245,20 @@ class AWAGAMVpnService : VpnService() {
 
                     // Test DoH connectivity in the background and warn the user if it fails
                     launch(Dispatchers.IO) {
-                        val error = probeUpstream()
-                        if (error != null) {
-                            Log.e(TAG, "DoH connectivity test failed: $error")
-                            dohErrorReported = true
-                            userPreferences.setVpnError(
-                                "${UserPreferences.VPN_ERROR_DOH_FAILED}:$error"
-                            )
+                        val result = dnsResolver.probeUpstream(
+                            DOH_PROBE_ATTEMPTS,
+                            DOH_PROBE_RETRY_DELAY_MS
+                        )
+                        when (result) {
+                            is DnsResolver.ProbeResult.Unreachable -> {
+                                Log.e(TAG, "DoH connectivity test failed: ${result.detail}")
+                                reportDohFailure(userPreferences, result.detail)
+                            }
+                            // Settings switched upstreams while this ran, and
+                            // probes the new one itself
+                            DnsResolver.ProbeResult.Stale ->
+                                Log.d(TAG, "Discarding probe of a replaced upstream")
+                            DnsResolver.ProbeResult.Reachable -> {}
                         }
                     }
                 } else {

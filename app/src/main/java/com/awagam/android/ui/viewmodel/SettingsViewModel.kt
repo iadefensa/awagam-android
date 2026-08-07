@@ -16,6 +16,8 @@ import com.awagam.android.data.preferences.DnsProvider
 import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
+import com.awagam.android.dns.DnsResolver
+import com.awagam.android.vpn.AWAGAMVpnService
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,6 +52,14 @@ data class SettingsUiState(
  * Manages blocklist configuration, import/export, and refresh operations.
  */
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        // Fewer attempts than the service’s startup probe, and closer together:
+        // Routing has long since settled by the time anyone opens settings, so a
+        // failure here is the provider’s, and the user is waiting on the answer
+        private const val SWITCH_PROBE_ATTEMPTS = 2
+        private const val SWITCH_PROBE_RETRY_DELAY_MS = 1_000L
+    }
 
     private val blocklistManager = ExternalBlocklistManager(application)
     private val blocklistRepository = DependencyContainer.getBlocklistRepository()
@@ -114,12 +124,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      * protection is toggled off and on. Cached answers came from the previous
      * resolver, whose filtering may differ, and cache keys don’t record which
      * one answered, so the cache is dropped rather than served across the switch.
+     * The new resolver is then probed, since an unreachable one would otherwise
+     * announce itself only as every site failing to load.
      */
     fun setUpstreamDns(provider: DnsProvider) {
         viewModelScope.launch {
+            val resolver = DependencyContainer.getDnsResolver()
             userPreferences.setUpstreamDns(provider.url)
-            DependencyContainer.getDnsResolver().switchUpstreamDns(provider.url)
+            resolver.switchUpstreamDns(provider.url)
+            // Whatever the previous upstream failed at says nothing about this one
+            AWAGAMVpnService.clearDohFailure(userPreferences)
             _uiState.update { it.copy(successMessage = "Now using ${provider.name}") }
+
+            // Only worth probing behind a live tunnel: The resolver is handed its
+            // VPN-protected socket factory when the service starts, so before that
+            // the probe would not take the route real queries do
+            if (!AWAGAMVpnService.isServiceRunning) return@launch
+
+            val result = resolver.probeUpstream(
+                SWITCH_PROBE_ATTEMPTS,
+                SWITCH_PROBE_RETRY_DELAY_MS
+            )
+            // A `Stale` result belongs to a provider since switched away from,
+            // and the switch that replaced it reports its own outcome—reporting
+            // this one would name the wrong provider, and resurrect a warning
+            // that switch just cleared
+            if (result !is DnsResolver.ProbeResult.Unreachable) return@launch
+
+            AWAGAMVpnService.reportDohFailure(userPreferences, result.detail)
+            _uiState.update {
+                it.copy(
+                    // Cleared so the snackbar shows this rather than the
+                    // confirmation it supersedes
+                    successMessage = null,
+                    error = "${provider.name} is not reachable (${result.detail}). " +
+                        "Queries will fail until it responds, or until you pick another provider."
+                )
+            }
         }
     }
 

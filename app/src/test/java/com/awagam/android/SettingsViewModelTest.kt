@@ -56,10 +56,14 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         app = ApplicationProvider.getApplicationContext()
         DependencyContainer.initialize(app)
+        // `exportWith` waits on a non-empty store, which a list left by an
+        // earlier test would satisfy before this one’s own write lands
+        clearStoredBlocklists(app)
     }
 
     @After
     fun tearDown() {
+        clearStoredBlocklists(app)
         Dispatchers.resetMain()
         DependencyContainer.clear()
     }
