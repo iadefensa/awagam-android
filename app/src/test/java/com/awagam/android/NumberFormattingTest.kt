@@ -77,6 +77,16 @@ class NumberFormattingTest {
     }
 
     @Test
+    fun `negative values come back exact`() {
+        // No count here can go negative, so this pins the fallback rather than
+        // a guarantee: Exact and possibly wide, never a throw and never the
+        // overflow that negating `Long.MIN_VALUE` would be
+        assertEquals("-1", formatCompact(-1))
+        assertEquals("-1500000", formatCompact(-1_500_000))
+        assertEquals("-9223372036854775808", formatCompact(Long.MIN_VALUE))
+    }
+
+    @Test
     fun `no value the cards can show exceeds four characters`() {
         // Sampled across the whole range rather than at the boundaries alone:
         // the cap is a property of the output, not of a handful of cases.
