@@ -33,6 +33,23 @@ import java.util.concurrent.atomic.AtomicLong
 private val Context.statisticsDataStore: DataStore<Preferences> by preferencesDataStore(name = "statistics")
 
 /**
+ * A stored counter as a `Long`, tolerating the `Int`s earlier versions wrote;
+ * the next flush rewrites those as `Long`.
+ *
+ * Counters only ever grow here, so a negative means the file is not what this
+ * app wrote, and it reads as zero rather than travelling on to everything that
+ * takes these numbers for counts—the compact format the home card and the
+ * notification share, and the exact format the statistics screen uses. The next
+ * flush writes a sound value over it.
+ */
+internal fun counterValue(stored: Any?): Long =
+    when (stored) {
+        is Long -> stored
+        is Int -> stored.toLong()
+        else -> 0L
+    }.coerceAtLeast(0L)
+
+/**
  * Statistics tracker for DNS queries, blocking, and performance metrics.
  * Provides real-time and historical data for the statistics dashboard.
  *
@@ -171,16 +188,11 @@ class StatisticsManager(private val context: Context) {
         context.statisticsDataStore.data.first().counter(BLOCKED_QUERIES) + pendingBlocked.get()
 
     /**
-     * Read a counter, tolerating values written as `Int` by earlier versions.
-     * `Preferences.Key` compares by name, so the stored entry is found either
-     * way and is rewritten as a `Long` by the next flush.
+     * Read a counter. `Preferences.Key` compares by name, so the stored entry
+     * is found whichever type it was written as.
      */
     private fun Preferences.counter(key: Preferences.Key<Long>): Long =
-        when (val value = asMap()[key]) {
-            is Long -> value
-            is Int -> value.toLong()
-            else -> 0L
-        }
+        counterValue(asMap()[key])
 
     /**
      * Record a DNS query.

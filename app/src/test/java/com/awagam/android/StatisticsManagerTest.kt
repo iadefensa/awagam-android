@@ -6,6 +6,7 @@ package com.awagam.android
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.awagam.android.statistics.StatisticsManager
+import com.awagam.android.statistics.counterValue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
@@ -106,6 +107,23 @@ class StatisticsManagerTest {
         val emissions = manager().statisticsFlow.take(3).toList()
 
         assertEquals(3, emissions.size)
+    }
+
+    @Test
+    fun `a stored counter reads as a Long whichever type it was written as`() {
+        assertEquals(42L, counterValue(42L))
+        assertEquals(42L, counterValue(42))
+        assertEquals(0L, counterValue(null))
+        assertEquals(0L, counterValue("42"))
+    }
+
+    @Test
+    fun `a negative stored counter reads as zero`() {
+        // Nothing here subtracts, so a negative means the file was written by
+        // something other than this app; the displays all assume counts
+        assertEquals(0L, counterValue(-1L))
+        assertEquals(0L, counterValue(-1))
+        assertEquals(0L, counterValue(Long.MIN_VALUE))
     }
 
     @Test
