@@ -589,69 +589,99 @@ private fun CountdownCard(
     }
 }
 
+private data class Stat(
+    val label: String,
+    val value: String,
+    val description: String
+)
+
+/** How the counts are sized, and whether that size fits three across. */
+private data class StatSizing(
+    val valueStyle: TextStyle,
+    val fitsInRow: Boolean
+)
+
 @Composable
 private fun StatCards(
     tldCount: Int,
     domainCount: Int,
     blockedCount: Long
 ) {
-    val values = listOf(
-        formatCompact(tldCount.toLong()),
-        formatCompact(domainCount.toLong()),
-        formatCompact(blockedCount)
+    val stats = listOf(
+        Stat(
+            label = "TLDs",
+            value = formatCompact(tldCount.toLong()),
+            description = "${NumberFormat.getNumberInstance().format(tldCount)} top-level domains blocked"
+        ),
+        Stat(
+            label = "Domains",
+            value = formatCompact(domainCount.toLong()),
+            description = "${NumberFormat.getNumberInstance().format(domainCount)} domains blocked"
+        ),
+        Stat(
+            label = "Blocked",
+            value = formatCompact(blockedCount),
+            description = "${NumberFormat.getNumberInstance().format(blockedCount)} requests blocked"
+        )
     )
 
-    // The three cards split the row evenly, so they all face the same width and
-    // the widest number decides the type size for all of them—one card set in
-    // smaller type than its neighbors would read as a defect, not as a fit
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Blocking statistics" }
+    ) {
         val available = (maxWidth - STAT_CARD_GAP * 2) / 3 - STAT_CARD_PADDING * 2
-        val valueStyle = statValueStyle(values, available.coerceAtLeast(0.dp))
+        val sizing = statSizing(stats.map { it.value }, available.coerceAtLeast(0.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "Blocking statistics" },
-            horizontalArrangement = Arrangement.spacedBy(STAT_CARD_GAP)
-        ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                label = "TLDs",
-                value = values[0],
-                valueStyle = valueStyle,
-                description = "${NumberFormat.getNumberInstance().format(tldCount)} top-level domains blocked"
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                label = "Domains",
-                value = values[1],
-                valueStyle = valueStyle,
-                description = "${NumberFormat.getNumberInstance().format(domainCount)} domains blocked"
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                label = "Blocked",
-                value = values[2],
-                valueStyle = valueStyle,
-                description = "${NumberFormat.getNumberInstance().format(blockedCount)} requests blocked"
-            )
+        if (sizing.fitsInRow) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(STAT_CARD_GAP)
+            ) {
+                stats.forEach { stat ->
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        stat = stat,
+                        valueStyle = sizing.valueStyle
+                    )
+                }
+            }
+        } else {
+            // A third of the row cannot hold the counts at any size the type
+            // floor allows. Stacking gives each card the full width, which is
+            // several times what even the widest count needs, so the numbers
+            // go back to full size rather than shrink for room they now have.
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(STAT_CARD_GAP)
+            ) {
+                stats.forEach { stat ->
+                    StatCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        stat = stat,
+                        valueStyle = sizing.valueStyle
+                    )
+                }
+            }
         }
     }
 }
 
 /**
- * The style for the counts, sized so that every one of [values] fits [available]
- * on a single line. `formatCompact` already holds them to four characters, which
- * fits at the default font scale; this is what keeps a raised scale or a narrow
- * screen from breaking the row, since a number can neither wrap—the card would
- * grow taller than the two beside it—nor ellipsize, which would misstate it.
+ * Sizes the counts so that every one of [values] fits [available] on a single
+ * line, and reports whether that succeeded. `formatCompact` already holds them
+ * to four characters, which fits at the default font scale; this is what keeps
+ * a raised scale or a narrow screen from breaking the row, since a number can
+ * neither wrap—the card would grow taller than the two beside it—nor ellipsize,
+ * which would misstate it.
  *
  * Stepping down from the full size rather than measuring per card is the point:
  * one size covers all three. The floor is in `sp`, so it still answers to the
- * font scale; at the very smallest screens the widest counts can reach it.
+ * font scale, and where even that overruns [available] the caller is told to
+ * lay the cards out some other way instead of cutting a digit off.
  */
 @Composable
-private fun statValueStyle(values: List<String>, available: Dp): TextStyle {
+private fun statSizing(values: List<String>, available: Dp): StatSizing {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val fullSize = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
@@ -660,28 +690,33 @@ private fun statValueStyle(values: List<String>, available: Dp): TextStyle {
     // font scale changes
     return remember(values, available, fullSize, measurer) {
         val availableWidth = with(density) { available.toPx() }
-        var style = fullSize
-        while (style.fontSize > STAT_VALUE_MIN_FONT_SIZE) {
-            val widest = values.maxOf { value ->
-                measurer.measure(value, style, softWrap = false).size.width
-            }
-            if (widest <= availableWidth) break
-            style = style.copy(fontSize = (style.fontSize.value - 1).sp)
+        fun widestAt(style: TextStyle) = values.maxOf { value ->
+            measurer.measure(value, style, softWrap = false).size.width
         }
-        style
+
+        var style = fullSize
+        var widest = widestAt(style)
+        while (widest > availableWidth && style.fontSize > STAT_VALUE_MIN_FONT_SIZE) {
+            style = style.copy(fontSize = (style.fontSize.value - 1).sp)
+            widest = widestAt(style)
+        }
+
+        val fitsInRow = widest <= availableWidth
+        StatSizing(
+            valueStyle = if (fitsInRow) style else fullSize,
+            fitsInRow = fitsInRow
+        )
     }
 }
 
 @Composable
 private fun StatCard(
     modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    valueStyle: TextStyle,
-    description: String
+    stat: Stat,
+    valueStyle: TextStyle
 ) {
     Card(
-        modifier = modifier.semantics { contentDescription = description },
+        modifier = modifier.semantics { contentDescription = stat.description },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -693,7 +728,7 @@ private fun StatCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = value,
+                text = stat.value,
                 style = valueStyle,
                 maxLines = 1,
                 softWrap = false,
@@ -701,7 +736,7 @@ private fun StatCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = label,
+                text = stat.label,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -68,12 +68,22 @@ class NumberFormattingTest {
     }
 
     @Test
+    fun `rounding at the largest unit does not widen the amount`() {
+        // The last unit has no next one to carry into, so it has to reach the
+        // one below with room to spare: 999.5T would otherwise print “1000T”
+        assertEquals("1P", formatCompact(999_500_000_000_000))
+        assertEquals("999T", formatCompact(999_400_000_000_000))
+        assertEquals("9.2E", formatCompact(Long.MAX_VALUE))
+    }
+
+    @Test
     fun `no value the cards can show exceeds four characters`() {
         // Sampled across the whole range rather than at the boundaries alone:
         // the cap is a property of the output, not of a handful of cases.
-        // Stops below a quadrillion, where the largest unit runs out.
+        // Stops where the multiplication would overflow; the cases above cover
+        // the rest of the way to `Long.MAX_VALUE`.
         var magnitude = 1L
-        while (magnitude <= 1_000_000_000_000L) {
+        while (magnitude <= 1_000_000_000_000_000L) {
             for (multiplier in 1..999) {
                 val value = magnitude * multiplier
                 val formatted = formatCompact(value)

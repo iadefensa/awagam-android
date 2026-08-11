@@ -6,15 +6,16 @@ package com.awagam.android.util
 import java.util.Locale
 import kotlin.math.round
 
-private val UNIT_SUFFIXES = listOf("K", "M", "B", "T")
+// Up to exa, so that the largest `Long` still scales to a single digit and the
+// last unit never has to print a four-digit amount
+private val UNIT_SUFFIXES = listOf("K", "M", "B", "T", "P", "E")
 
 /**
  * Abbreviate a count for space-constrained display (stat cards, notifications).
  * Values below 1,000 stay exact; larger ones scale to the biggest unit that
  * leaves a whole part, carrying one decimal only below ten so the result stays
- * within four characters—the stat cards fit about that many—for everything
- * below a quadrillion, past what any counter here reaches. A trailing “.0” is
- * dropped, so 2,000 reads as “2K” rather than “2.0K”.
+ * within four characters—the stat cards fit about that many—for every `Long`.
+ * A trailing “.0” is dropped, so 2,000 reads as “2K” rather than “2.0K”.
  *
  * Formatted against `Locale.ROOT`, not the device locale: the separator has to
  * be a dot for `removeSuffix` to match at all—on a device set to German it would
