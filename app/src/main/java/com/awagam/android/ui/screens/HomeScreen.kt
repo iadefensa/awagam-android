@@ -686,9 +686,9 @@ private fun statSizing(values: List<String>, available: Dp): StatSizing {
     val density = LocalDensity.current
     val fullSize = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
 
-    // Keyed on the measurer, which Compose rebuilds when the density or the
-    // font scale changes
-    return remember(values, available, fullSize, measurer) {
+    // The density is keyed for itself rather than through the measurer, which
+    // Compose happens to rebuild along with it
+    return remember(values, available, fullSize, measurer, density) {
         val availableWidth = with(density) { available.toPx() }
         fun widestAt(style: TextStyle) = values.maxOf { value ->
             measurer.measure(value, style, softWrap = false).size.width
