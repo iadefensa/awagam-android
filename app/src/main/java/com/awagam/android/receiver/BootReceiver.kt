@@ -6,6 +6,7 @@ package com.awagam.android.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.VpnService
 import android.util.Log
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.vpn.AWAGAMVpnService
@@ -30,7 +31,10 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val autoStart = UserPreferences(context).autoStartFlow.first()
-                if (autoStart) {
+                // Only an activity can ask for VPN consent, so without it the
+                // service could do nothing but start, fail, and leave an error
+                // behind for the user to find
+                if (autoStart && VpnService.prepare(context) == null) {
                     context.startForegroundService(
                         Intent(context, AWAGAMVpnService::class.java).apply {
                             action = AWAGAMVpnService.ACTION_START

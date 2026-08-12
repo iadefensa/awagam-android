@@ -2,10 +2,6 @@
 
 What is left before the first release. Delete this file once 1.0.0 is out.
 
-## Test
-
-* [ ] Check the icon on a device once installed—adaptive masks (circle, squircle) and the themed icon under Wallpaper & style
-
 ## Store assets
 
 * [ ] Take screenshots of the finished app (at least 2 [1080×1920?], phone-sized)
@@ -16,7 +12,6 @@ What is left before the first release. Delete this file once 1.0.0 is out.
 ## Version
 
 * [ ] Set the release date in `CHANGELOG.md` (currently `@@`)
-* [ ] Confirm `versionCode` and `versionName` in `app/build.gradle.kts`
 
 ## Signing
 
