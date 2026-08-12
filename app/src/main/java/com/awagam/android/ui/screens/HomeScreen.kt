@@ -752,7 +752,7 @@ private fun VpnErrorCard(
     val isDoHError = error.startsWith(UserPreferences.VPN_ERROR_DOH_FAILED)
     val errorMessage = when {
         error == UserPreferences.VPN_ERROR_ANOTHER_VPN ->
-            "Could not start protection. Another VPN appears to be active. Android only allows one VPN at a time."
+            "Could not start protection. Another VPN may be holding the connection—Android allows only one at a time. Check your VPN settings, then turn protection back on."
         error == UserPreferences.VPN_ERROR_PERMISSION_DENIED ->
             "Android did not grant the VPN connection. If another VPN app is set as always-on, turn that off in your VPN settings, then try again."
         error == UserPreferences.VPN_ERROR_START_TIMEOUT ->

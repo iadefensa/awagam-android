@@ -63,6 +63,15 @@ class AWAGAMVpnService : VpnService() {
         private const val DOH_PROBE_ATTEMPTS = 3
         private const val DOH_PROBE_RETRY_DELAY_MS = 2_000L
 
+        // A start right after boot can reach a VPN stack that is not ready yet,
+        // and `establish()` then returns null even with consent held and no other
+        // VPN present, so a single null is not yet a failure. The delays double
+        // from the first value up to the cap, keeping the whole run under the
+        // toggle’s own start timeout.
+        private const val ESTABLISH_ATTEMPTS = 5
+        private const val ESTABLISH_RETRY_DELAY_MS = 500L
+        private const val ESTABLISH_RETRY_MAX_DELAY_MS = 4_000L
+
         // Matches the statistics flush cadence: Refreshing faster would only
         // re-post the same numbers, and the notification is ambient information
         private const val NOTIFICATION_UPDATE_INTERVAL_MS = 30_000L
@@ -226,8 +235,8 @@ class AWAGAMVpnService : VpnService() {
                 // Bail out if stop was requested during initialization
                 ensureActive()
 
-                // Configure and establish VPN (non-suspending, so check afterwards)
-                val iface = establishVpn()
+                // Configure and establish VPN
+                val iface = establishVpnWithRetry()
 
                 // If stop was requested during establishment, close and abort
                 if (!isActive) {
@@ -262,7 +271,7 @@ class AWAGAMVpnService : VpnService() {
                         }
                     }
                 } else {
-                    Log.e(TAG, "Failed to establish VPN interface (another VPN may be active)")
+                    Log.e(TAG, "Failed to establish VPN interface after $ESTABLISH_ATTEMPTS attempts")
                     failStartup(UserPreferences.VPN_ERROR_ANOTHER_VPN)
                 }
             } catch (e: CancellationException) {
@@ -292,6 +301,26 @@ class AWAGAMVpnService : VpnService() {
                 failStartup(UserPreferences.VPN_ERROR_GENERAL)
             }
         }
+    }
+
+    /**
+     * Establish the tunnel, retrying with backoff while the platform settles.
+     * `establish()` is documented to return null when another VPN holds the
+     * connection, but it also does so briefly after boot on a stack that is not
+     * ready yet, and those two are indistinguishable from here—so exhaust the
+     * retries before treating a null as final.
+     */
+    private suspend fun establishVpnWithRetry(): ParcelFileDescriptor? {
+        var retryDelayMs = ESTABLISH_RETRY_DELAY_MS
+        repeat(ESTABLISH_ATTEMPTS) { attempt ->
+            establishVpn()?.let { return it }
+            if (attempt < ESTABLISH_ATTEMPTS - 1) {
+                Log.w(TAG, "Could not establish VPN interface, retrying in $retryDelayMs ms")
+                delay(retryDelayMs)
+                retryDelayMs = (retryDelayMs * 2).coerceAtMost(ESTABLISH_RETRY_MAX_DELAY_MS)
+            }
+        }
+        return null
     }
 
     /**
