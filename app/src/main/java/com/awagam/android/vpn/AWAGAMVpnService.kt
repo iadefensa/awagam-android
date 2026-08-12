@@ -200,6 +200,17 @@ class AWAGAMVpnService : VpnService() {
 
         startupJob = serviceScope.launch {
             try {
+                // Consent can be withdrawn while the app is away, and every start
+                // path but the toggle—sticky restart, `onResume()`, the watchdog—
+                // can land here without it. `establish()` would only answer null,
+                // which is indistinguishable from a busy stack, so the retries
+                // below would spend themselves on something no wait can fix.
+                if (VpnService.prepare(this@AWAGAMVpnService) != null) {
+                    Log.e(TAG, "VPN consent missing, cannot start")
+                    failStartup(UserPreferences.VPN_ERROR_PERMISSION_DENIED)
+                    return@launch
+                }
+
                 // Load blocklists before starting
                 blocklistRepository.loadBlocklists()
 
@@ -308,7 +319,8 @@ class AWAGAMVpnService : VpnService() {
      * `establish()` is documented to return null when another VPN holds the
      * connection, but it also does so briefly after boot on a stack that is not
      * ready yet, and those two are indistinguishable from here—so exhaust the
-     * retries before treating a null as final.
+     * retries before treating a null as final. Only null is retried; a thrown
+     * exception describes the configuration, which no amount of waiting changes.
      */
     private suspend fun establishVpnWithRetry(): ParcelFileDescriptor? {
         var retryDelayMs = ESTABLISH_RETRY_DELAY_MS
@@ -352,22 +364,23 @@ class AWAGAMVpnService : VpnService() {
         stopSelf()
     }
 
+    /**
+     * Build and establish the tunnel. Exceptions are left to propagate: A
+     * rejected address, route, or MTU is a fixed property of this configuration,
+     * so it would fail the same way on every retry, and swallowing it here would
+     * disguise it as the transient null that retrying does answer.
+     */
     private fun establishVpn(): ParcelFileDescriptor? {
-        return try {
-            Builder()
-                .setSession("AWAGAM")
-                .addAddress(VPN_ADDRESS, 32)
-                // Route only the VPN DNS server through the tunnel so that DNS queries
-                // are intercepted while all other traffic bypasses the VPN entirely
-                .addRoute(VPN_DNS, 32)
-                .addDnsServer(VPN_DNS)
-                .setMtu(VPN_MTU)
-                .setBlocking(true)
-                .establish()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to establish VPN", e)
-            null
-        }
+        return Builder()
+            .setSession("AWAGAM")
+            .addAddress(VPN_ADDRESS, 32)
+            // Route only the VPN DNS server through the tunnel so that DNS queries
+            // are intercepted while all other traffic bypasses the VPN entirely
+            .addRoute(VPN_DNS, 32)
+            .addDnsServer(VPN_DNS)
+            .setMtu(VPN_MTU)
+            .setBlocking(true)
+            .establish()
     }
 
     /**
