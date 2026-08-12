@@ -40,8 +40,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         // How long a start may take—permission dialog, blocklist load, and tunnel
-        // setup—before the toggle gives up and says so
-        private const val START_TIMEOUT_MS = 20_000L
+        // setup—before the toggle gives up and says so. Must stay clear of the
+        // service’s own establish retries, which can spend 7.5 s of that budget
+        // on a stack that is still settling: reporting a timeout underneath a
+        // start that is still working would only be corrected moments later.
+        private const val START_TIMEOUT_MS = 30_000L
     }
 
     private val userPreferences = UserPreferences(application)
