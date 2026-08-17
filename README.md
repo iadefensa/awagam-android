@@ -79,6 +79,8 @@ The app ships with no blocking rules, so a fresh install blocks nothing until a 
 | **Direct** | APK | Distribute the signed `.apk` file |
 | **F-Droid** | APK | Built from source by F-Droid; listing metadata in `fastlane/` |
 
+(Play Store builds are signed by Google under Play App Signing, so their signature differs from that of a locally built APK. The two are not update-compatible: switching between direct and Play installs requires uninstalling first, which clears the app’s configuration.)
+
 The build is configured for reproducibility (`org.gradle.reproducibleFileOrder`, `org.gradle.reproducibleArchiveContents`, and `dependenciesInfo` omitted from APK and bundle). Release builds also strip debug logging via ProGuard, so no DNS query data reaches logcat—see [the privacy policy](PRIVACY.md).
 
 Store listing text and images live in `fastlane/metadata/android/en-US/`: `title.txt`, `short_description.txt`, `full_description.txt`, per-`versionCode` notes under `changelogs/`, and `images/` (`icon.png` 512×512, `featureGraphic.png` 1024×500, `phoneScreenshots/`). F-Droid reads these directly; for the Play Store they are the source to copy from.
