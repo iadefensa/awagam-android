@@ -2,10 +2,6 @@
 
 What is left before the first release.
 
-## Signing
-
-* [ ] Store keystore and credentials somewhere they survive this machine—losing them means a new upload key has to be requested from Google, and direct APK downloads break for existing users
-
 ## Releasing
 
 ### Play Console
