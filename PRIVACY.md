@@ -30,7 +30,7 @@ All data is stored locally. Nothing is synced to external servers.
 
 The app opts out of Android’s backup and transfer system. None of the above is copied into your Google account, and none of it is carried over by a device-to-device transfer when you set up a new phone.
 
-This is deliberate. Which blocklists you subscribe to says a great deal about you, and that is not ours to place in anyone’s cloud storage. The trade is that a new device starts empty: use `Export config` under Settings to move your setup yourself, to a destination you choose.
+This is deliberate. Which blocklists you subscribe to may say something about you, and that is not something to just place in anyone’s cloud storage. The trade is that a new device starts empty: use `Export config` under Settings to move your setup yourself, to a destination you choose.
 
 ### Network Connections
 
@@ -77,7 +77,7 @@ The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution. Their p
 
 ## Open Source
 
-This app is free software, licensed under the GNU General Public License, version 3 or later. You can verify these claims by reviewing the code [on GitHub](https://github.com/iadefensa/awagam-android).
+This app is free software, licensed under the GNU General Public License. You can review the license and verify any claims made in this document by reviewing the code [on GitHub](https://github.com/iadefensa/awagam-android).
 
 ## Contact
 
