@@ -1,14 +1,10 @@
 # @@ AWAGAM Android 1.0.0 Launch Plan
 
-What is left before the first release. Delete this file once 1.0.0 is out.
+What is left before the first release.
 
 ## Signing
 
-Note: `keystore.properties` currently points at `awagam-test-only.jks`, and a release APK built today is signed `CN=AWAGAM TEST ONLY - DO NOT DISTRIBUTE`. Point it at the real keystore before building anything for upload—whatever key signs the first upload becomes the upload key for the life of the listing.
-
-* [ ] Generate the release keystore, as described under “Release Build” in [the README](README.md)
-* [ ] Store keystore and credentials somewhere they survive this machine—losing them means the Play listing can never be updated
-* [ ] Build and install a signed release APK on a device, and verify filtering end to end against a real blocklist
+* [ ] Store keystore and credentials somewhere they survive this machine—losing them means a new upload key has to be requested from Google, and direct APK downloads break for existing users
 
 ## Releasing
 
@@ -23,4 +19,13 @@ Answer text for all four is prepared under “Play Console Declarations” in [t
 
 ### F-Droid
 
-* [ ] @@
+Optional for 1.0.0—the Play listing does not depend on it. Listing text and images are already in place under `fastlane/`.
+
+* [ ] Tag `v1.0.0`; F-Droid builds from a tag, not from `main`
+* [ ] Open a merge request against [fdroiddata](https://gitlab.com/fdroid/fdroiddata) adding `metadata/com.awagam.android.yml` (`AutoName`, `RepoType: git`, `Repo`, a `builds` entry pinning the tag and `gradle: yes`, `AutoUpdateMode`, `UpdateCheckMode: Tags`)
+
+## Post-Release
+
+* [ ] Fill the store URL(s) on the IA Defensa solution page
+* [ ] Publish the announcement post
+* [ ] Delete this plan file
