@@ -1,6 +1,6 @@
 AWAGAM blocks access to top-level domains and domains at the DNS level, using blocklists you configure yourself.
 
-It runs a local VPN that intercepts DNS queries only. Blocked lookups resolve to 0.0.0.0; everything else is forwarded to the DNS-over-HTTPS resolver of your choice. Your ordinary Internet traffic is never routed through the VPN.
+It runs a local VPN that intercepts DNS queries. Blocked lookups resolve to 0.0.0.0; everything else is forwarded to the DNS-over-HTTPS resolver of your choice. Your ordinary Internet traffic is never routed through the VPN.
 
 The app ships with no blocking rules of its own. What gets blocked is entirely up to you.
 

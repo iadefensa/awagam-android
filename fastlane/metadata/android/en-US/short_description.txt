@@ -1,1 +1,1 @@
-Block TLDs and domains at the DNS level using your own blocklists.
+Block TLDs and domains at the DNS level using your own blocklists
