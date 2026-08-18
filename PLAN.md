@@ -6,12 +6,9 @@ What is left before the first release.
 
 ### Play Console
 
-Answer text for all four is prepared under “Play Console Declarations” in [the README](README.md).
-
-* [ ] Declare `VpnService` use, and justify the `specialUse` foreground service type
-* [ ] Complete the Data safety form—the app collects nothing; see [the privacy policy](PRIVACY.md)
-* [ ] Link the privacy policy
-* [ ] Complete the content rating questionnaire
+* [ ] Install the Play-signed build from the internal track and verify filtering, the first-run VPN consent prompt, and auto-start on boot
+* [ ] Decide whether to exclude Chromebooks under device targeting—on ChromeOS `VpnService` covers Android app traffic only, not the browser or the system
+* [ ] Promote the same bundle to production, and allow several days for review
 
 ### F-Droid
 
