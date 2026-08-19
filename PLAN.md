@@ -6,9 +6,8 @@ What is left before the first release.
 
 ### Play Console
 
-* [ ] Install the Play-signed build from the internal track and verify filtering, the first-run VPN consent prompt, and auto-start on boot
-* [ ] Decide whether to exclude Chromebooks under device targeting—on ChromeOS `VpnService` covers Android app traffic only, not the browser or the system
-* [ ] Promote the same bundle to production, and allow several days for review
+* [x] Promote the same bundle to production, and allow several days for review
+* [ ] Decide whether to exclude Chromebooks under device targeting (_Test and release_ → _Reach and devices_ → _Device catalog_)
 
 ### F-Droid
 
