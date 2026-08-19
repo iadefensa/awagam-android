@@ -40,7 +40,7 @@ android {
         applicationId = "com.awagam.android"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -97,6 +97,8 @@ android {
         }
         jniLibs {
             useLegacyPackaging = false
+            // Multi-process DataStore is unused, so this library is never loaded
+            excludes += "**/libdatastore_shared_counter.so"
         }
     }
 
