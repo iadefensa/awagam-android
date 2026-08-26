@@ -6,7 +6,6 @@ What is left before the first release.
 
 ### Play Console
 
-* [x] Promote the same bundle to production, and allow several days for review
 * [ ] Decide whether to exclude Chromebooks under device targeting (_Test and release_ → _Reach and devices_ → _Device catalog_)
 
 ### F-Droid
