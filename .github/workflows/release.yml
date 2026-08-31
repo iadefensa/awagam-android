@@ -86,6 +86,50 @@ jobs:
             --generate-notes \
             dist/awagam-"$version".apk dist/awagam.apk dist/SHA256SUMS
 
-      - name: "Remove signing key"
+      - name: "Install fdroidserver"
+        run: pipx install fdroidserver
+
+      - name: "Restore F-Droid repository key"
+        env:
+          FDROID_KEYSTORE_BASE64: ${{ secrets.FDROID_KEYSTORE_BASE64 }}
+        run: printenv FDROID_KEYSTORE_BASE64 | base64 --decode > fdroid/keystore.p12
+
+      # The branch does not exist yet before the first release
+      - name: "Check out the published repository"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          remote="https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          git clone --depth 1 --branch gh-pages "$remote" pages 2>/dev/null || {
+            mkdir pages
+            git -C pages init -b gh-pages -q
+            git -C pages remote add origin "$remote"
+          }
+
+      - name: "Build the F-Droid index"
+        env:
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+          FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
+        run: |
+          mkdir -p fdroid/repo fdroid/metadata/com.awagam.android/en-US
+          # Carry published APKs forward, so older versions stay installable
+          cp pages/fdroid/repo/*.apk fdroid/repo/ 2>/dev/null || true
+          cp "app/build/outputs/apk/release/awagam-$version.apk" fdroid/repo/
+          cp -R fastlane/metadata/android/en-US/. fdroid/metadata/com.awagam.android/en-US/
+          cd fdroid && fdroid update --pretty
+
+      - name: "Publish the F-Droid repository"
+        run: |
+          rm -rf pages/fdroid/repo
+          mkdir -p pages/fdroid
+          cp -R fdroid/repo pages/fdroid/repo
+          cd pages
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Publish AWAGAM $version"
+          git push -q origin gh-pages
+
+      - name: "Remove signing keys"
         if: always()
-        run: rm -f awagam-release.jks keystore.properties
+        run: rm -f awagam-release.jks keystore.properties fdroid/keystore.p12

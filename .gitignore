@@ -12,7 +12,14 @@ local.properties
 # Signing
 *.jks
 *.keystore
+*.p12
 keystore.properties
+
+# F-Droid repository (published to gh-pages, generated locally)
+fdroid/repo/
+fdroid/archive/
+fdroid/tmp/
+fdroid/metadata/com.awagam.android/
 
 # Build outputs
 *.aab

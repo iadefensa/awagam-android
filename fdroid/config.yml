@@ -1,0 +1,23 @@
+# Configuration for the self-hosted AWAGAM F-Droid repository.
+# Passwords come from the environment, so this file is safe to commit;
+# `keystore.p12` is not, and is restored from a secret in CI.
+
+sdk_path: $ANDROID_HOME
+
+repo_url: https://iadefensa.github.io/awagam-android/fdroid/repo
+repo_name: AWAGAM
+repo_icon: icon.png
+repo_description: >-
+  Official repository for the AWAGAM TLD and domain blocker, published by
+  Jens Oliver Meiert (IA Defensa). Builds are signed with the same key as
+  the direct downloads, so installations from either source update
+  interchangeably.
+
+keystore: keystore.p12
+repo_keyalias: awagam-repo
+keystorepass: {env: FDROID_KEYSTORE_PASS}
+keypass: {env: FDROID_KEY_PASS}
+
+# Keep every published version in the repository rather than moving
+# older ones into a separate archive
+archive_older: 0
