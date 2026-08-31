@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fdroid>
+	<repo icon="icon.png" name="AWAGAM" pubkey="308204f6308202dea0030201020209009d8539b37f1be098300d06092a864886f70d01010b050030283110300e060355040b1307462d44726f6964311430120603550403130b61776167616d2d7265706f3020170d3236303833313136313033335a180f32303534303131363136313033335a30283110300e060355040b1307462d44726f6964311430120603550403130b61776167616d2d7265706f30820222300d06092a864886f70d01010105000382020f003082020a02820201009cadd40e32de52ca15e2927f2e36f44a47c0b242894cc609ec5b6a721cd4b0e1bb046feec45014b9533d6526cbaeedfe7fbfeaba3ac2bbb1f6c593aef420db739f1977c5dc231237f87bf12894b0c623a5fdca16b95995fac25a2b196af5703d06682766f5c070c0b603876501ec786367da6beb99647ddea24da061d08c144d632daa0bb7f085de3f7037483650eb10cd55a43875cd389ab74d0f734cb3f9279a4a941dbd22f624f5746d686eaa656f1052b19e717374a5847b513986d2410898db9e256b790ab2341c3bcc9cf1c24a946d4e39229f3dd29f83f94e17dde6c7861c27258361aa61a10743716397862d3c361b18710f7152a9e5d33c5f830fb79a66b6d17a70d6040e1692284bb51165c6b56b992648fe312461258710a9c059609331c36593e09c9e1589666949d2381dcdc08bc959584ce4a735e540f9cc57c51929e88125a2efd66b7f97a39b42befb4e3e1c8ae725c4d74ba8e75621f715fc60044d3c2f87fcd30974b8710eb8a2ee9963ab7103db6db2f0967c72fab7f3204c6c9df5b0b4c4c1d4e05e67cc0167078246290578b1220ddd69bd04ba2780598d0047b4eabbcad534d71d077a9b9a5f87dc81536a6ed54c67e0af02d08acdabc86fde08da30867e98428f4917f8c211149449ace963d2bcde89dbe17125d7c17f569c76906b5bab041caa1f01927825e035abc578cb763646ebb524b739d50203010001a321301f301d0603551d0e04160414a80d42a7b39473852b45a316383c8483bd3a9868300d06092a864886f70d01010b050003820201007ba7850d2868a20c7eff4e59a04b09188bdd8f2bb1bd4840a25bcb8e209da290de348085f7826c930fe1ea13a08f4ee6df1edc6678372fa9335b367326bdbe1f1cf11c11a77980b7872ef1f18eaea540a35dfb05b59d2a37d69b06dfc4382f0d8a2fede80b529d6d380fad955773655bcd167b34fd0d39e21890172b6c6d04f0ce8351c2aff47c1eb3ccc0626d48fb3a4d95d0b6dcd6e089443f1e2f77463e4605018705ea9a9f4d360f54c231caa240b2bc32a78f5dad2ffe01ff23edcbaf1fefbf32d68de3668e6bf4b97d08c3f14e6394e2fe5039179ef0ca09650677f87530f845274234dceccf44e9b5d26630853f1d5ed7c859a4e8086e9e7471b8d3626b42cc41470573962115381851b303f64243e8582fa999cab8d90980330db675b9ad200b24e5c328105cab0ec2955dae555cff220a259ede18d3c75c48897683d0fbd2e17e0885f5afa9e36221e701a86fd55005a27dfcea561cc13b3fb02b6797dc34ae32ec3cddaa2384fe8786aaa193eef00d52c35fcaf543af3f37a7eb69ad5cad65763b912dfa39b00f29eccc1b902b52326d17a2e41688475bab165de961850caaf750553db98ed9d781eee6211492e4fe998f1d489f11135dc59738535c1323b3319400d7c6f022a8421021d7a0e89bb7bfb1e9035b60374d7276261ceab83f74ff2779adec191a24f865ca783b601d20accf5ad575e7705579538780" timestamp="1788193959" url="https://iadefensa.github.io/awagam-android/fdroid/repo" version="20002">
+		<description>Official repository for the AWAGAM TLD and domain blocker, published by Jens Oliver Meiert (IA Defensa). Builds are signed with the same key as the direct downloads, so installations from either source update interchangeably.</description>
+	</repo>
+	<application id="com.awagam.android">
+		<id>com.awagam.android</id>
+		<added>2026-08-31</added>
+		<lastupdated>2026-08-31</lastupdated>
+		<name>AWAGAM TLD and Domain Blocker</name>
+		<summary>Block TLDs and domains at the DNS level using your own blocklists</summary>
+		<desc>AWAGAM blocks access to top-level domains and domains at the DNS level, using blocklists you configure yourself.
+
+It runs a local VPN that intercepts DNS queries. Blocked lookups resolve to 0.0.0.0; everything else is forwarded to the DNS-over-HTTPS resolver of your choice. Your ordinary Internet traffic is never routed through the VPN.
+
+The app ships with no blocking rules of its own. What gets blocked is entirely up to you.
+
+Features:
+
+* Block TLDs and domains at the DNS level
+* DNS-over-HTTPS upstream (DNS4EU, Cloudflare, Google, Quad9, OpenDNS, AdGuard)
+* Add, edit, and manage as many blocklist URLs as you like
+* Compatible with the AWAGAM browser extension blocklist format, including bundles
+* Temporarily disable protection (5 minutes, 15 minutes, 1 hour) with automatic restart
+* DNS query statistics: queries, blocked requests, cache performance
+* Export your configuration to Pi-hole, AdGuard Home, or hosts format
+* Background blocklist updates every 6 hours
+* Watchdog that restarts filtering if the system stops it
+* Auto-start on boot
+
+Privacy:
+
+AWAGAM collects no personal data. All processing happens on your device. There is no analytics, no telemetry, no crash reporting, and no DNS query logging. The only network connections are DNS queries to the upstream resolver you select and blocklist fetches from URLs you configure.
+
+The app opts out of Android backup and device-to-device transfer, so your blocklist subscriptions are never copied into your Google account. Use the export function to move your configuration yourself.
+
+Limitations:
+
+* DNS sees domain names, not full URLs, so URL-level blocking is not possible. Use the browser extension for that.
+* Android permits one VPN at a time, so AWAGAM cannot run alongside another VPN app.
+* Apps that use their own DNS-over-HTTPS resolver bypass system DNS filtering.</desc>
+		<license>GPL-3.0-or-later</license>
+		<categories>Security,Internet</categories>
+		<category>Security</category>
+		<web>https://iadefensa.com/solutions/awagam-android/</web>
+		<source>https://github.com/iadefensa/awagam-android</source>
+		<tracker>https://github.com/iadefensa/awagam-android/issues</tracker>
+		<changelog>https://github.com/iadefensa/awagam-android/blob/main/CHANGELOG.md</changelog>
+		<author>IA Defensa</author>
+		<marketversion></marketversion>
+		<marketvercode>2</marketvercode>
+		<package>
+			<version>1.0.0</version>
+			<versioncode>2</versioncode>
+			<apkname>awagam-1.0.0.apk</apkname>
+			<hash type="sha256">e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d</hash>
+			<size>4081341</size>
+			<sdkver>28</sdkver>
+			<targetSdkVersion>36</targetSdkVersion>
+			<added>2026-08-31</added>
+			<sig>c6c4547324d4fd647fa0cafbe2bc2565</sig>
+			<permissions>ACCESS_NETWORK_STATE,FOREGROUND_SERVICE,FOREGROUND_SERVICE_SPECIAL_USE,INTERNET,POST_NOTIFICATIONS,RECEIVE_BOOT_COMPLETED,WAKE_LOCK,com.awagam.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</permissions>
+			<nativecode>arm64-v8a,armeabi-v7a,x86,x86_64</nativecode>
+		</package>
+	</application>
+</fdroid>
