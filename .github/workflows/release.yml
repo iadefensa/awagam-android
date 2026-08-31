@@ -1,0 +1,91 @@
+name: "Release"
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: "Build and publish"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out repository"
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: "Set up Gradle"
+        uses: gradle/actions/setup-gradle@v6
+
+      # Catches a tag that disagrees with the version the build would produce
+      - name: "Check tag against versionName"
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(sed -n 's/^val appVersionName = "\(.*\)"$/\1/p' app/build.gradle.kts)"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match versionName $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_ENV"
+
+      - name: "Restore signing key"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          printenv KEYSTORE_BASE64 | base64 --decode > awagam-release.jks
+          cat > keystore.properties <<PROPERTIES
+          storeFile=awagam-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=awagam
+          keyPassword=$KEY_PASSWORD
+          PROPERTIES
+
+      # Unit tests run as part of assembleRelease
+      - name: "Assemble release"
+        run: ./gradlew assembleRelease
+
+      # The distributed APK must carry the certificate registered for Android
+      # developer verification, or it will not install once enforcement applies
+      - name: "Verify signing certificate"
+        env:
+          EXPECTED: "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
+        run: |
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          actual="$("$apksigner" verify --print-certs "app/build/outputs/apk/release/awagam-$version.apk" \
+            | awk '/SHA-256 digest/ {print $NF}')"
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "APK signed with $actual, expected $EXPECTED" >&2
+            exit 1
+          fi
+
+      - name: "Collect release assets"
+        run: |
+          mkdir dist
+          cp "app/build/outputs/apk/release/awagam-$version.apk" "dist/awagam-$version.apk"
+          # Version-independent copy, so `releases/latest/download/awagam.apk` keeps working
+          cp "dist/awagam-$version.apk" dist/awagam.apk
+          cd dist && sha256sum ./*.apk > SHA256SUMS
+
+      # Published as a draft, so the release notes get written before it goes out
+      - name: "Create draft release"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "AWAGAM $version" \
+            --generate-notes \
+            dist/awagam-"$version".apk dist/awagam.apk dist/SHA256SUMS
+
+      - name: "Remove signing key"
+        if: always()
+        run: rm -f awagam-release.jks keystore.properties
