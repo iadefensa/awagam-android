@@ -1,12 +1,10 @@
 # IA Defensa AWAGAM TLD and Domain Blocker
 
-<!-- @@ Uncommen/link once app is available on at least one store -->
-
-<!-- Visit IA Defensa for [general information about this app](https://iadefensa.com/solutions/awagam-android/). -->
+Visit IA Defensa for [general information about this app](https://iadefensa.com/solutions/awagam-android/).
 
 <!-- Really, GitHub? -->
 <div align="center">
-	<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/awagam-1-home.png" alt="The home screen of the AWAGAM Android app." width="30%"></a>
+	<a href="https://iadefensa.com/solutions/awagam-android/"><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/awagam-1-home.png" alt="The home screen of the AWAGAM Android app." width="30%"></a>
 </div>
 
 ## Development
@@ -76,17 +74,34 @@ Each release after the first needs `versionCode` incremented in `app/build.gradl
 
 `-r` replaces the installed app while preserving its configuration. Switching signing keys requires `adb uninstall com.awagam.android` first, as Android rejects an update signed with a different key. Expect to grant VPN consent again after reinstalling.
 
-The app ships with no blocking rules, so a fresh install blocks nothing until a blocklist is added under Settings. [The AWAGAM blocklists repository](https://github.com/j9t/awagam-blocklists) has ready-made lists for testing.
+The app ships with no blocking rules, so a fresh install blocks nothing until a blocklist is added under _Settings_. The IA Defensa website provides documentation on [**where to find and how to create blocklists**](https://iadefensa.com/solutions/awagam-chromium/#blocklists).
 
 ### Distribution
 
-| Platform | Format | Notes |
-| --- | --- | --- |
-| **Play Store** | AAB | Upload the `.aab` file |
-| **Direct** | APK | Distribute the signed `.apk` file |
-| **F-Droid** | APK | Built from source by F-Droid; listing metadata in `fastlane/` |
+AWAGAM is distributed directly and through F-Droid; the Play Store is deferred, and the AAB build is kept for the day that changes.
 
-(Play Store builds are signed by Google under Play App Signing, so their signature differs from that of a locally built APK. The two are not update-compatible: switching between direct and Play installs requires uninstalling first, which clears the app’s configuration.)
+| Channel | Notes |
+| --- | --- |
+| **Direct** | `https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk`, a version-independent link to the newest release |
+| **Own F-Droid repository** | `https://iadefensa.github.io/awagam-android/fdroid/repo`, which also delivers updates |
+| **F-Droid** | Pending submission; listing metadata in `fastlane/` |
+| **Play Store** | Deferred; upload the `.aab` file |
+
+Both live channels serve the same signed APK, so installations from either update interchangeably. It carries this certificate:
+
+```
+SHA-256  05:97:AE:6F:8C:8C:E4:E5:AE:28:9E:03:48:D1:A0:3D:5B:82:78:93:00:BC:E0:BD:94:50:68:09:9C:3D:51:05
+```
+
+Check a download with `apksigner verify --print-certs awagam.apk`, and against the release’s `SHA256SUMS` with `shasum -a 256 -c SHA256SUMS`. The same fingerprint is registered with Google for Android developer verification, which apps must satisfy to remain installable on certified devices.
+
+(Play Store builds would be signed by Google under Play App Signing, so their signature differs from that of a locally built APK. The two are not update-compatible: switching between direct and Play installs requires uninstalling first, which clears the app’s configuration.)
+
+#### Releasing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against `versionName`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
+
+The F-Droid repository is configured under `fdroid/`. Its index is signed with a second key, separate from the app’s, held in `fdroid/keystore.p12`; passwords come from the environment, so nothing secret is committed.
 
 The build is configured for reproducibility (`org.gradle.reproducibleFileOrder`, `org.gradle.reproducibleArchiveContents`, and `dependenciesInfo` omitted from APK and bundle). Release builds also strip debug logging via ProGuard, so no DNS query data reaches logcat—see [the privacy policy](PRIVACY.md).
 
@@ -128,12 +143,12 @@ com.awagam.android/
 
 Tests: `BlocklistDeletionTest`, `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsProvidersTest`, `DnsResolverTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
 
-## Contributing
-
-[Contributions are welcome.](CONTRIBUTING.md) They are subject to the [Contributor License Agreement](CLA.md).
-
 ## License
 
 AWAGAM Android is free software, licensed under [the GNU General Public License, version 3 or later](LICENSE.txt). It comes with no warranty.
 
 Commercial terms are available on request for use that the GPL does not accommodate.
+
+## Contributing
+
+[Contributions are welcome.](CONTRIBUTING.md) They are subject to the [Contributor License Agreement](CLA.md).
