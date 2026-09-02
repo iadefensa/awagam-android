@@ -82,8 +82,8 @@ AWAGAM is distributed directly and through F-Droid; the Play Store is deferred, 
 
 | Channel | Notes |
 | --- | --- |
-| **Direct** | `https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk`, a version-independent link to the newest release |
-| **Own F-Droid repository** | `https://iadefensa.github.io/awagam-android/fdroid/repo`, which also delivers updates |
+| **Direct** | https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk, a version-independent link to the newest release |
+| **Own F-Droid repository** | https://iadefensa.github.io/awagam-android/fdroid/repo, which also delivers updates |
 | **F-Droid** | Pending submission; listing metadata in `fastlane/` |
 | **Play Store** | Deferred; upload the `.aab` file |
 
@@ -117,7 +117,7 @@ These answers describe the app, not a particular release, so they hold until the
 
 **Data safety.** The app collects and shares no user data, so the form reduces to “No” on data collection and data sharing; the encryption-in-transit and data-deletion questions do not apply. Preferences, cached blocklists, and query counts stay on the device, are never transmitted, and are removed on uninstall. `android:allowBackup="false"` plus the backup and data extraction rules keep them out of Android backup and device-to-device transfer as well. There is no analytics, telemetry, crash reporting, advertising, or DNS query logging. The two outbound connection types—DNS queries to the user’s chosen resolver and blocklist fetches from URLs the user adds—are user-initiated app functionality, not collection by the developer.
 
-**Privacy policy URL.** `https://github.com/iadefensa/awagam-android/blob/main/PRIVACY.md`
+**Privacy policy URL.** https://github.com/iadefensa/awagam-android/blob/main/PRIVACY.md
 
 **Content rating.** Category: utility or productivity. Every content question (violence, sexuality, profanity, controlled substances, gambling, horror) is “No.” The app has no user-generated content, no user-to-user communication, no ads, and no digital purchases, and it neither collects nor shares location or personal information.
 
