@@ -64,7 +64,7 @@ Output:
 * APK: `app/build/outputs/apk/release/awagam-*.apk`
 * AAB: `app/build/outputs/bundle/release/awagam-release.aab`
 
-Each release after the first needs `versionCode` incremented in `app/build.gradle.kts`; Android refuses to install a build whose `versionCode` is not higher than the installed one.
+Each release after the first needs `versionCode` incremented in `app/build.gradle.kts`; Android refuses to install a build whose `versionCode` is not higher than the installed one. That `versionCode` also needs an entry under `Builds` in `fdroid/metadata/com.awagam.android.yml`; without one, `fdroid update` leaves the release notes out of the index current F-Droid clients read.
 
 ### Running on a Device
 
@@ -99,7 +99,7 @@ Check a download with `apksigner verify --print-certs awagam.apk`, and against t
 
 #### Releasing
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against `versionName`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against `versionName` and the F-Droid metadata against `versionCode`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
 
 The F-Droid repository is configured under `fdroid/`. Its index is signed with a second key, separate from the app’s, held in `fdroid/keystore.p12`; passwords come from the environment, so nothing secret is committed.
 

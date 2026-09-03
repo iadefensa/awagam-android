@@ -1,1 +1,1 @@
-Removed an unused library from the app package, slightly reducing download size
+Released initial version […]

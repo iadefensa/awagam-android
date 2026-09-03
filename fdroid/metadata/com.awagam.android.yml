@@ -8,3 +8,9 @@ WebSite: https://iadefensa.com/solutions/awagam-android/
 SourceCode: https://github.com/iadefensa/awagam-android
 IssueTracker: https://github.com/iadefensa/awagam-android/issues
 Changelog: https://github.com/iadefensa/awagam-android/blob/main/CHANGELOG.md
+
+# Release notes reach index-v2—what current clients read—only through a matching
+# `Builds` entry; add one per released version
+Builds:
+  - versionName: 1.0.0
+    versionCode: 2

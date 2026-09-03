@@ -25,7 +25,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       # Catches a tag that disagrees with the version the build would produce
-      - name: "Check tag against versionName"
+      - name: "Check tag against `versionName`"
         run: |
           tag="${GITHUB_REF_NAME#v}"
           version="$(sed -n 's/^val appVersionName = "\(.*\)"$/\1/p' app/build.gradle.kts)"
@@ -34,6 +34,15 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_ENV"
+
+      # Release notes reach index-v2 only for versions the F-Droid metadata lists
+      - name: "Check F-Droid metadata against `versionCode`"
+        run: |
+          code="$(sed -n 's/^ *versionCode = \([0-9]*\)$/\1/p' app/build.gradle.kts)"
+          if ! grep -q "^ *versionCode: $code$" fdroid/metadata/com.awagam.android.yml; then
+            echo "No Builds entry for versionCode $code in fdroid/metadata/com.awagam.android.yml" >&2
+            exit 1
+          fi
 
       - name: "Restore signing key"
         env:

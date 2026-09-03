@@ -1,6 +1,6 @@
 # @@ AWAGAM Android Launch Plan
 
-1.0.0 is out, distributed directly and through our own F-Droid repository. What is left is the F-Droid listing, the download page, and the announcement.
+1.0.0 is out, distributed directly and through our own F-Droid repository. What is left is the F-Droid listing and the announcement.
 
 Google Play is deferred, not ruled out—the AAB build and the Play Console declarations in the README stay where they are, so the option remains open at the cost of one upload.
 
