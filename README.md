@@ -84,16 +84,20 @@ AWAGAM is distributed directly and through F-Droid; the Play Store is deferred, 
 | --- | --- |
 | **Direct** | https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk, a version-independent link to the newest release |
 | **Own F-Droid repository** | https://iadefensa.github.io/awagam-android/fdroid/repo, which also delivers updates |
-| **F-Droid** | Pending submission; listing metadata in `fastlane/` |
+| **F-Droid** | https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47708 is in review (with listing metadata in `fastlane/`) |
 | **Play Store** | Deferred; upload the `.aab` file |
 
-Both live channels serve the same signed APK, so installations from either update interchangeably. It carries this certificate:
+Every channel but the Play Store serves the same signed APK, so installations from any of them update interchangeably. It carries this certificate:
 
 ```
 SHA-256  05:97:AE:6F:8C:8C:E4:E5:AE:28:9E:03:48:D1:A0:3D:5B:82:78:93:00:BC:E0:BD:94:50:68:09:9C:3D:51:05
 ```
 
-Check a download with `apksigner verify --print-certs awagam.apk`, and against the release’s `SHA256SUMS` with `shasum -a 256 -c SHA256SUMS`. The same fingerprint is registered with Google for Android developer verification, which apps must satisfy to remain installable on certified devices.
+Check a download with `apksigner verify --print-certs awagam.apk`, and against the release’s `SHA256SUMS` with `shasum -a 256 -c SHA256SUMS`. The same fingerprint is registered with Google for Android developer verification, which apps must satisfy to remain installable on certified devices; enforcement begins on 2026-09-30 in Brazil, Indonesia, Singapore, and Thailand, and elsewhere in 2027.
+
+Rotating this key means registering the new certificate with Google again, and rotating the F-Droid repository key means every subscriber re-adds the repository. Neither is reversible cheaply, so both should be avoided unless a key is compromised.
+
+F-Droid builds the app from source and verifies the result against the release published here, then distributes this repository’s APK instead of signing its own. `Binaries` and `AllowedAPKSigningKeys` in `metadata/com.awagam.android.yml` at [fdroiddata](https://gitlab.com/fdroid/fdroiddata) arrange that, and the build has to stay reproducible for it to hold. Dropping either field hands signing to F-Droid, whose key cannot be exchanged for this one afterwards—users would have to uninstall to move between channels.
 
 (Play Store builds would be signed by Google under Play App Signing, so their signature differs from that of a locally built APK. The two are not update-compatible: switching between direct and Play installs requires uninstalling first, which clears the app’s configuration.)
 

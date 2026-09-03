@@ -6,16 +6,13 @@ Google Play is deferred, not ruled out—the AAB build and the Play Console decl
 
 ## F-Droid
 
-Listing text and images are already in place under `fastlane/`, and `v1.0.0` is tagged. A local build of that tag reproduces the released APK byte for byte, so the reproducible-build path is available.
+* [ ] Wait for [merge request #47708](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47708) to be processed
+  - [ ] Update the README’s _Distribution_ table (which describes the listing as in review)
+* [ ] Once F-Droid publishes, check that the APK it serves carries the certificate the README documents rather than F-Droid’s (`apksigner verify --print-certs`)—a different fingerprint means the reproducible-build path broke and every install would have to be redone to switch channels
 
-* [ ] Open a merge request against [fdroiddata](https://gitlab.com/fdroid/fdroiddata) adding `metadata/com.awagam.android.yml` (`AutoName`, `RepoType: git`, `Repo`, a `Builds` entry pinning the tag and `gradle: yes`, `AutoUpdateMode`, `UpdateCheckMode: Tags`): [#47708](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47708)
-* [ ] Use the reproducible-build path (`Binaries` plus `AllowedAPKSigningKeys`) rather than letting F-Droid sign: F-Droid then verifies its build against the one here and publishes this repo’s APK; this keeps direct and F-Droid installations interchangeable
+## Play Store
 
-## Open
-
-* Rotating the app signing key means registering the new certificate with Google again, and rotating the repository key means every subscriber re-adds the repository.
-* Developer verification is enforced from 2026-09-30 in Brazil, Indonesia, Singapore, and Thailand, and elsewhere from 2027.
-* Whether Play App Signing accepts the existing key. (If it does, Play builds keep the certificate the README documents and stay update-compatible with direct and F-Droid installations; if not, adding Play later splits the installed base, and every month of deferral makes that split bigger. The README currently assumes the latter.)
+* [ ] Establish whether Play App Signing accepts the existing key—if it does, Play builds keep the certificate the README documents and stay update-compatible with direct and F-Droid installations; if not, adding Play later splits the installed base, and every month of deferral makes that split bigger (the README assumes the latter)
 
 ## Post-Release
 
