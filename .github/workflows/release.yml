@@ -28,7 +28,7 @@ jobs:
       - name: "Check tag against `versionName`"
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          version="$(sed -n 's/^val appVersionName = "\(.*\)"$/\1/p' app/build.gradle.kts)"
+          version="$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' app/build.gradle.kts)"
           if [ "$tag" != "$version" ]; then
             echo "Tag $GITHUB_REF_NAME does not match versionName $version" >&2
             exit 1

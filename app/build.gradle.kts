@@ -9,8 +9,6 @@ plugins {
 // Set base archive name for AAB bundles
 base.archivesName.set("awagam")
 
-val appVersionName = "1.0.0"
-
 // Load keystore properties if available
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
@@ -26,7 +24,7 @@ tasks.whenTaskAdded {
             val variant = name.removePrefix("assemble").lowercase()
             val outDir = layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
             outDir.listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
-                file.renameTo(File(outDir, "awagam-$appVersionName.apk"))
+                file.renameTo(File(outDir, "awagam-${android.defaultConfig.versionName}.apk"))
             }
         }
     }
@@ -41,7 +39,7 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = 2
-        versionName = appVersionName
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
