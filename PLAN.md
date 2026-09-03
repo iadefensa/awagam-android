@@ -8,7 +8,7 @@ Google Play is deferred, not ruled out—the AAB build and the Play Console decl
 
 Listing text and images are already in place under `fastlane/`, and `v1.0.0` is tagged. A local build of that tag reproduces the released APK byte for byte, so the reproducible-build path is available.
 
-* [ ] Open a merge request against [fdroiddata](https://gitlab.com/fdroid/fdroiddata) adding `metadata/com.awagam.android.yml` (`AutoName`, `RepoType: git`, `Repo`, a `Builds` entry pinning the tag and `gradle: yes`, `AutoUpdateMode`, `UpdateCheckMode: Tags`)
+* [ ] Open a merge request against [fdroiddata](https://gitlab.com/fdroid/fdroiddata) adding `metadata/com.awagam.android.yml` (`AutoName`, `RepoType: git`, `Repo`, a `Builds` entry pinning the tag and `gradle: yes`, `AutoUpdateMode`, `UpdateCheckMode: Tags`): [#47708](https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47708)
 * [ ] Use the reproducible-build path (`Binaries` plus `AllowedAPKSigningKeys`) rather than letting F-Droid sign: F-Droid then verifies its build against the one here and publishes this repo’s APK; this keeps direct and F-Droid installations interchangeable
 
 ## Open
