@@ -84,7 +84,7 @@ AWAGAM is distributed directly and through F-Droid; the Play Store is deferred, 
 | --- | --- |
 | **Direct** | https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk, a version-independent link to the newest release |
 | **Own F-Droid repository** | https://iadefensa.github.io/awagam-android/fdroid/repo, which also delivers updates |
-| **F-Droid** | https://gitlab.com/fdroid/fdroiddata/-/merge_requests/47708 is in review (with listing metadata in `fastlane/`) |
+| **F-Droid** | https://f-droid.org/packages/com.awagam.android/ (with listing metadata in `fastlane/`) |
 | **Play Store** | Deferred; upload the `.aab` file |
 
 Every channel but the Play Store serves the same signed APK, so installations from any of them update interchangeably. It carries this certificate:
@@ -104,6 +104,8 @@ F-Droid builds the app from source and verifies the result against the release p
 #### Releasing
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against `versionName` and the F-Droid metadata against `versionCode`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
+
+F-Droid picks up new tags on its own, but its build fetches the APK from the published release to compare against, so publish the draft promptly—while it’s a draft, that download fails. F-Droid doesn’t report failures; check that a release arrived on [the listing](https://f-droid.org/packages/com.awagam.android/) within about a week, and if not, read its build log at `https://monitor.f-droid.org/builds/log/com.awagam.android/<versionCode>`.
 
 The F-Droid repository is configured under `fdroid/`. Its index is signed with a second key, separate from the app’s, held in `fdroid/keystore.p12`; passwords come from the environment, so nothing secret is committed.
 
