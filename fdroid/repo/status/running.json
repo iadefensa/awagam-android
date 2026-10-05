@@ -1,5 +1,5 @@
 {
-  "/etc/issue.net": "Ubuntu 24.04.4 LTS",
+  "/etc/issue.net": "Ubuntu 24.04.5 LTS",
   "antiFeatures": {},
   "apksigner": "/usr/local/lib/android/sdk/build-tools/37.0.0/apksigner",
   "archivePolicy0": [],
@@ -8,28 +8,26 @@
     "--pretty"
   ],
   "disabled": [],
-  "endTimestamp": 1788193963082,
+  "endTimestamp": 1791206919051,
   "failedBuilds": {},
   "jarsigner": "/usr/bin/jarsigner",
   "keytool": "/usr/bin/keytool",
   "needsUpdate": [
     "com.awagam.android"
   ],
-  "noPackages": [
-    "com.awagam.android"
-  ],
+  "noPackages": [],
   "noUpdateCheck": [
     "com.awagam.android"
   ],
   "stages": {
-    "delete_disabled_builds": 1788193957903,
-    "index.make repo": 1788193959731,
-    "prepare_apps repo": 1788193958277,
-    "process_apks": 1788193957903,
-    "read_added_date_from_all_apks": 1788193958277,
-    "remove_apks": 1788193958277,
-    "scan_repo_files": 1788193958276
+    "delete_disabled_builds": 1791206913997,
+    "index.make repo": 1791206916007,
+    "prepare_apps repo": 1791206914618,
+    "process_apks": 1791206913997,
+    "read_added_date_from_all_apks": 1791206914618,
+    "remove_apks": 1791206914618,
+    "scan_repo_files": 1791206914617
   },
-  "startTimestamp": 1788193957000,
+  "startTimestamp": 1791206913000,
   "subcommand": "update"
 }

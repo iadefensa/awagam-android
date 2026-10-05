@@ -14,7 +14,7 @@
       }
     },
     "address": "https://iadefensa.github.io/awagam-android/fdroid/repo",
-    "timestamp": 1788193959000,
+    "timestamp": 1791206916000,
     "categories": {
       "Internet": {
         "name": {
@@ -31,22 +31,22 @@
   "packages": {
     "com.awagam.android": {
       "metadata": {
-        "added": 1788193958000,
+        "added": 1791206914000,
         "categories": [
           "Security",
           "Internet"
         ],
         "changelog": "https://github.com/iadefensa/awagam-android/blob/main/CHANGELOG.md",
         "issueTracker": "https://github.com/iadefensa/awagam-android/issues",
-        "lastUpdated": 1788193958000,
+        "lastUpdated": 1791206914000,
         "license": "GPL-3.0-or-later",
         "sourceCode": "https://github.com/iadefensa/awagam-android",
         "webSite": "https://iadefensa.com/solutions/awagam-android/",
         "featureGraphic": {
           "en-US": {
-            "name": "/com.awagam.android/en-US/featureGraphic_PDjftmdmfRpNiqIoCTpbCebzAR-cX2YAerQrKOTCbHA=.png",
-            "sha256": "3c38dfb667667d1a4d8aa228093a5b09e6f3011f9c5f66007ab42b28e4c26c70",
-            "size": 63949
+            "name": "/com.awagam.android/en-US/featureGraphic_kJUNSXQbFDL7DBF8TIOC2YpBZyVgqc94d6_fqFtAroM=.png",
+            "sha256": "90950d49741b1432fb0c117c4c8382d98a41672560a9cf7877afdfa85b40ae83",
+            "size": 3993
           }
         },
         "screenshots": {
@@ -101,8 +101,64 @@
         "preferredSigner": "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
       },
       "versions": {
+        "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e": {
+          "added": 1791206914000,
+          "file": {
+            "name": "/awagam-1.0.1.apk",
+            "sha256": "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e",
+            "size": 4096897
+          },
+          "manifest": {
+            "nativecode": [
+              "arm64-v8a",
+              "armeabi-v7a",
+              "x86",
+              "x86_64"
+            ],
+            "versionName": "1.0.1",
+            "versionCode": 3,
+            "usesSdk": {
+              "minSdkVersion": 28,
+              "targetSdkVersion": 36
+            },
+            "signer": {
+              "sha256": [
+                "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
+              ]
+            },
+            "usesPermission": [
+              {
+                "name": "android.permission.INTERNET"
+              },
+              {
+                "name": "android.permission.ACCESS_NETWORK_STATE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+              },
+              {
+                "name": "android.permission.POST_NOTIFICATIONS"
+              },
+              {
+                "name": "android.permission.RECEIVE_BOOT_COMPLETED"
+              },
+              {
+                "name": "android.permission.WAKE_LOCK"
+              },
+              {
+                "name": "com.awagam.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+              }
+            ]
+          },
+          "whatsNew": {
+            "en-US": "Updated dependencies and store graphic"
+          }
+        },
         "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d": {
-          "added": 1788193958000,
+          "added": 1791206914000,
           "file": {
             "name": "/awagam-1.0.0.apk",
             "sha256": "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d",
@@ -152,6 +208,9 @@
                 "name": "com.awagam.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
               }
             ]
+          },
+          "whatsNew": {
+            "en-US": "Released initial version […]"
           }
         }
       }
