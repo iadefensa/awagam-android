@@ -89,8 +89,8 @@ class BlocklistUpdateWorker(
                 Log.d(TAG, "Blocklists changed, reloaded matcher")
             }
 
-            // Only actual failures—“warning” also carries an `errorMessage` (a
-            // bundle’s skipped imports), but that refresh succeeded
+            // Only actual failures—“warning” also carries an `errorMessage`
+            // (skipped entries, groups, or bundle imports), but that refresh succeeded
             val failedConfigs = configs.filter { it.enabled && it.status == "error" }
             if (failedConfigs.isNotEmpty()) {
                 notifyRefreshFailure(failedConfigs.size)

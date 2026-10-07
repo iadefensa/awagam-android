@@ -32,12 +32,17 @@ object BlocklistValidator {
     private const val MAX_DOMAIN_LENGTH = 253
 
     /**
-     * Validation result with optional error message and metadata.
+     * Validation result with optional error message and metadata. Results of
+     * `[validateBlocklist]` also carry the kept groups and what was skipped.
      */
     data class ValidationResult(
         val valid: Boolean,
         val error: String? = null,
-        val metadata: BlocklistMetadata? = null
+        val metadata: BlocklistMetadata? = null,
+        val groups: Map<String, BlocklistGroup>? = null,
+        val skipped: List<String> = emptyList(),
+        val skippedEntries: Int = 0,
+        val skippedGroups: Int = 0
     )
 
     /**
@@ -318,7 +323,81 @@ object BlocklistValidator {
     }
 
     /**
-     * Validate AWAGAM blocklist format.
+     * Validate a parsed AWAGAM blocklist, skipping invalid entries and groups
+     * without a name instead of failing (matching AWAGAM Chromium’s tolerant
+     * mode). Returns the kept groups, with metadata counting only those.
+     * Structural errors and the group limit still fail validation.
+     */
+    fun validateBlocklist(element: JsonElement): ValidationResult {
+        if (element !is JsonObject) {
+            return ValidationResult(false, "Root must be an object")
+        }
+
+        val groups = linkedMapOf<String, BlocklistGroup>()
+        val skipped = mutableListOf<String>()
+        var skippedEntries = 0
+        var skippedGroups = 0
+
+        for ((groupId, groupElement) in element) {
+            if (groupElement !is JsonObject) {
+                return ValidationResult(false, "Group \"$groupId\" must be an object")
+            }
+
+            val name = (groupElement["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            if (name.isNullOrBlank()) {
+                skipped.add("Group \"$groupId\" missing required \"name\" field")
+                skippedGroups++
+                continue
+            }
+
+            val fields = mutableMapOf<String, List<String>>()
+            for (field in listOf("tlds", "domains", "urls")) {
+                val fieldElement = groupElement[field] ?: continue
+                if (fieldElement !is JsonArray) {
+                    return ValidationResult(false, "Group \"$groupId\".$field must be an array")
+                }
+                fields[field] = fieldElement.mapNotNull { item ->
+                    val value = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    val error = if (value == null) {
+                        "Group \"$groupId\".$field contains non-string item"
+                    } else {
+                        entryError(field, value, groupId)
+                    }
+                    if (error != null) {
+                        skipped.add(error)
+                        skippedEntries++
+                    }
+                    value.takeIf { error == null }
+                }
+            }
+
+            groups[groupId] = BlocklistGroup(
+                name = name,
+                context = groupElement["context"],
+                tlds = fields["tlds"].orEmpty(),
+                domains = fields["domains"].orEmpty(),
+                urls = fields["urls"].orEmpty()
+            )
+        }
+
+        if (groups.size > MAX_GROUPS) {
+            return ValidationResult(false, "Too many groups (max $MAX_GROUPS)")
+        }
+
+        return ValidationResult(
+            valid = true,
+            metadata = countRules(groups),
+            groups = groups,
+            skipped = skipped,
+            skippedEntries = skippedEntries,
+            skippedGroups = skippedGroups
+        )
+    }
+
+    /**
+     * Validate AWAGAM blocklist format strictly, failing on the first invalid
+     * entry—for blocklists already cleaned by `[validateBlocklist]`, like the
+     * merged result of a bundle.
      * Returns validation result with metadata on success.
      */
     fun validateBlocklistFormat(groups: Map<String, BlocklistGroup>): ValidationResult {
@@ -326,52 +405,40 @@ object BlocklistValidator {
             return ValidationResult(false, "Too many groups (max $MAX_GROUPS)")
         }
 
-        var totalTlds = 0
-        var totalDomains = 0
-        var totalUrls = 0
-
         for ((groupId, group) in groups) {
-            // Validate name
             if (group.name.isBlank()) {
                 return ValidationResult(false, "Group \"$groupId\" missing required \"name\" field")
             }
-
-            // Validate TLDs
-            for (tld in group.tlds) {
-                if (!isValidTld(tld)) {
-                    return ValidationResult(false, "Invalid TLD in group \"$groupId\": $tld")
+            for ((field, entries) in listOf("tlds" to group.tlds, "domains" to group.domains, "urls" to group.urls)) {
+                for (entry in entries) {
+                    entryError(field, entry, groupId)?.let { return ValidationResult(false, it) }
                 }
             }
-            totalTlds += group.tlds.size
-
-            // Validate domains
-            for (domain in group.domains) {
-                if (!isValidDomain(domain)) {
-                    return ValidationResult(false, "Invalid domain in group \"$groupId\": $domain")
-                }
-            }
-            totalDomains += group.domains.size
-
-            // Validate URLs
-            for (url in group.urls) {
-                if (!isValidBlocklistEntry(url)) {
-                    return ValidationResult(false, "Invalid URL in group \"$groupId\": $url")
-                }
-            }
-            totalUrls += group.urls.size
         }
 
-        val totalRules = totalTlds + totalDomains + totalUrls
+        return ValidationResult(valid = true, metadata = countRules(groups))
+    }
 
-        return ValidationResult(
-            valid = true,
-            metadata = BlocklistMetadata(
-                totalRules = totalRules,
-                tlds = totalTlds,
-                domains = totalDomains,
-                urls = totalUrls,
-                groups = groups.size
-            )
+    /**
+     * The error for an invalid TLD, domain, or URL entry, or null if it’s valid.
+     */
+    private fun entryError(field: String, entry: String, groupId: String): String? = when {
+        field == "tlds" && !isValidTld(entry) -> "Invalid TLD in group \"$groupId\": $entry"
+        field == "domains" && !isValidDomain(entry) -> "Invalid domain in group \"$groupId\": $entry"
+        field == "urls" && !isValidBlocklistEntry(entry) -> "Invalid URL in group \"$groupId\": $entry"
+        else -> null
+    }
+
+    private fun countRules(groups: Map<String, BlocklistGroup>): BlocklistMetadata {
+        val tlds = groups.values.sumOf { it.tlds.size }
+        val domains = groups.values.sumOf { it.domains.size }
+        val urls = groups.values.sumOf { it.urls.size }
+        return BlocklistMetadata(
+            totalRules = tlds + domains + urls,
+            tlds = tlds,
+            domains = domains,
+            urls = urls,
+            groups = groups.size
         )
     }
 

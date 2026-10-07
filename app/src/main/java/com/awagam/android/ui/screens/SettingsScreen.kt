@@ -641,7 +641,7 @@ private fun BlocklistCard(
                 Text(
                     text = blocklist.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    // “warning” means active with skipped bundle imports—not an error
+                    // “warning” means active with skipped entries, groups, or bundle imports—not an error
                     color = if (blocklist.status == "warning") Warning else ErrorText,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis

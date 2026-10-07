@@ -156,9 +156,41 @@ class ExternalBlocklistManager(private val context: Context) {
             isLenient = true
         }
 
+        // Number of skipped entries named in a warning—stored warnings are
+        // truncated anyway, and a broken blocklist may have thousands
+        private const val MAX_LISTED_SKIP_DETAILS = 10
+
+        /**
+         * Build the warning for a refresh that skipped bundle imports, invalid
+         * entries, or groups without a name, or null if nothing was skipped.
+         * All summaries come first, so they survive truncation.
+         */
+        internal fun skipWarning(
+            skippedEntries: Int,
+            skippedGroups: Int,
+            skipDetails: List<String>,
+            importFailures: List<String> = emptyList(),
+            imports: Int = 0
+        ): String? {
+            val skippedParts = listOfNotNull(
+                "$skippedEntries invalid ${if (skippedEntries == 1) "entry" else "entries"}".takeIf { skippedEntries > 0 },
+                "$skippedGroups invalid ${if (skippedGroups == 1) "group" else "groups"}".takeIf { skippedGroups > 0 }
+            )
+            val summaries = listOfNotNull(
+                "${importFailures.size} of $imports imports skipped".takeIf { importFailures.isNotEmpty() },
+                "${skippedParts.joinToString(" and ")} skipped".takeIf { skippedParts.isNotEmpty() }
+            )
+            if (summaries.isEmpty()) return null
+
+            val listedDetails = skipDetails.take(MAX_LISTED_SKIP_DETAILS) +
+                listOfNotNull("…".takeIf { skipDetails.size > MAX_LISTED_SKIP_DETAILS })
+            val details = (importFailures + listedDetails).joinToString("; ")
+            return "${summaries.joinToString(", ")}: $details"
+        }
+
         /**
          * Resolved bundle—merged groups of all imported blocklists, plus metadata
-         * and an optional warning naming skipped imports.
+         * and an optional warning naming skipped imports, entries, and groups.
          */
         internal data class ResolvedBundle(
             val groups: Map<String, BlocklistGroup>,
@@ -174,8 +206,9 @@ class ExternalBlocklistManager(private val context: Context) {
         /**
          * Resolve a bundle by fetching and merging all imported blocklists.
          * Imports that are invalid, duplicates, or fail to load or validate
-         * are skipped with a warning; the refresh fails only if no import can
-         * be loaded, or if the merged result exceeds the blocklist limits.
+         * are skipped with a warning, as are invalid entries and groups without
+         * a name within imports; the refresh fails only if no import can be
+         * loaded, or if the merged result exceeds the blocklist limits.
          * Fetching is injected so the resolution logic can be tested without
          * a network.
          */
@@ -261,6 +294,9 @@ class ExternalBlocklistManager(private val context: Context) {
             // Validate and merge in import order, so the group ID prefixes stay deterministic
             val merged = linkedMapOf<String, BlocklistGroup>()
             val failures = mutableListOf<String>()
+            val skipDetails = mutableListOf<String>()
+            var skippedEntries = 0
+            var skippedGroups = 0
             var totalSize = bundleSize
             var importsLoaded = 0
 
@@ -287,12 +323,14 @@ class ExternalBlocklistManager(private val context: Context) {
                     if (BlocklistValidator.isBundle(importElement)) {
                         throw Exception("is itself a bundle—bundles may only import plain blocklists")
                     }
-                    val groups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
-                    val validation = BlocklistValidator.validateBlocklistFormat(groups)
+                    val validation = BlocklistValidator.validateBlocklist(importElement)
                     if (!validation.valid) {
                         throw Exception(validation.error)
                     }
-                    groups
+                    skippedEntries += validation.skippedEntries
+                    skippedGroups += validation.skippedGroups
+                    validation.skipped.forEach { skipDetails.add("${entry.importUrl}: $it") }
+                    validation.groups
                 } catch (e: Exception) {
                     failures.add("${entry.importUrl} (${e.message ?: e.javaClass.simpleName})")
                     null
@@ -325,11 +363,13 @@ class ExternalBlocklistManager(private val context: Context) {
                 imports = structureValidation.imports.size,
                 importsLoaded = importsLoaded
             )
-            val warning = if (failures.isNotEmpty()) {
-                "${failures.size} of ${structureValidation.imports.size} imports skipped: ${failures.joinToString("; ")}"
-            } else {
-                null
-            }
+            val warning = skipWarning(
+                skippedEntries,
+                skippedGroups,
+                skipDetails,
+                importFailures = failures,
+                imports = structureValidation.imports.size
+            )
             return ResolvedBundle(merged, metadata, warning)
         }
     }
@@ -516,23 +556,28 @@ class ExternalBlocklistManager(private val context: Context) {
                 metadata = resolved.metadata
                 warning = resolved.warning
             } else {
-                // Parse into blocklist groups
-                val groups: Map<String, BlocklistGroup> = json.decodeFromString(body)
-
-                // Validate blocklist format (TLDs, domains, URLs)
-                val validationResult = BlocklistValidator.validateBlocklistFormat(groups)
+                // Validate blocklist format; invalid entries and groups without a
+                // name are skipped with a warning, and only what’s kept is cached
+                // and counted
+                val validationResult = BlocklistValidator.validateBlocklist(jsonElement)
                 if (!validationResult.valid) {
                     throw Exception("Validation failed: ${validationResult.error}")
                 }
-                bodyToCache = body
+                bodyToCache = json.encodeToString(validationResult.groups.orEmpty())
                 metadata = validationResult.metadata ?: BlocklistMetadata()
+                warning = skipWarning(
+                    validationResult.skippedEntries,
+                    validationResult.skippedGroups,
+                    validationResult.skipped
+                )
             }
 
             // Cache the blocklist (bundles are cached as their merged blocklist)
             writeCacheFile(id, bodyToCache)
 
-            // Update with success status and validated metadata; bundles with
-            // skipped imports stay active but carry a warning naming them
+            // Update with success status and validated metadata; blocklists with
+            // skipped entries, groups, or bundle imports stay active but carry a
+            // warning naming them
             updateBlocklist(config.copy(
                 lastUpdated = nowIso,
                 lastAttempted = nowIso,

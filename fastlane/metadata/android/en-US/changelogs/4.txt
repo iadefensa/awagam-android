@@ -1,0 +1,1 @@
+Updated invalid blocklist entries and groups without a name to be skipped with a warning instead of failing the whole blocklist

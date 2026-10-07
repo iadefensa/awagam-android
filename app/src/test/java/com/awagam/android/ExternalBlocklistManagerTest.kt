@@ -8,6 +8,7 @@ import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -202,6 +203,34 @@ class ExternalBlocklistManagerTest {
         assertEquals(100, merged.size)
     }
 
+    // Skip Warnings
+
+    @Test
+    fun `skip warnings summarize before listing details`() {
+        assertEquals(null, ExternalBlocklistManager.skipWarning(0, 0, emptyList()))
+        assertEquals(
+            "1 invalid entry skipped: Invalid TLD in group \"g\": x",
+            ExternalBlocklistManager.skipWarning(1, 0, listOf("Invalid TLD in group \"g\": x"))
+        )
+        assertEquals(
+            "2 invalid groups skipped: a; b",
+            ExternalBlocklistManager.skipWarning(0, 2, listOf("a", "b"))
+        )
+        assertEquals(
+            "1 of 2 imports skipped, 3 invalid entries and 1 invalid group skipped: dead; a; b; c; d",
+            ExternalBlocklistManager.skipWarning(3, 1, listOf("a", "b", "c", "d"), importFailures = listOf("dead"), imports = 2)
+        )
+    }
+
+    @Test
+    fun `skip warnings list only the first 10 details`() {
+        val details = (0 until 12).map { "entry$it" }
+        val warning = ExternalBlocklistManager.skipWarning(12, 0, details)!!
+        assertTrue(warning, warning.startsWith("12 invalid entries skipped: entry0; "))
+        assertTrue(warning, warning.endsWith("entry9; …"))
+        assertFalse(warning, warning.contains("entry10"))
+    }
+
     // Bundle Resolution
 
     private fun bundleOf(vararg urls: String) = Json.parseToJsonElement(
@@ -323,6 +352,33 @@ class ExternalBlocklistManagerTest {
         }
         assertEquals(1, resolved.metadata.importsLoaded)
         assertTrue(resolved.warning!!.contains("bad.json"))
+    }
+
+    @Test
+    fun `imports with invalid entries are kept, and only valid entries count`() = runTest {
+        val bundle = bundleOf("https://a.example/mixed.json", "https://a.example/ok.json", "https://a.example/dead.json")
+        val mixedJson = """{"ads": {"name": "Ads", "domains": ["ads.example.net", "-invalid.com", 42]}, "nameless": {"domains": ["nameless.com"]}}"""
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { url ->
+            when {
+                url.contains("mixed") -> mixedJson
+                url.contains("dead") -> throw Exception("HTTP 404")
+                else -> memberJson
+            }
+        }
+        assertEquals(listOf("import1_ads", "import2_ads"), resolved.groups.keys.toList())
+        assertEquals(listOf("ads.example.net"), resolved.groups["import1_ads"]!!.domains)
+        assertEquals(2, resolved.metadata.totalRules)
+        assertEquals(2, resolved.metadata.domains)
+        assertEquals(2, resolved.metadata.groups)
+        assertEquals(2, resolved.metadata.importsLoaded)
+        assertTrue(
+            resolved.warning!!,
+            resolved.warning!!.startsWith(
+                "1 of 3 imports skipped, 2 invalid entries and 1 invalid group skipped: " +
+                    "https://a.example/dead.json (HTTP 404); " +
+                    "https://a.example/mixed.json: Invalid domain in group \"ads\": -invalid.com; "
+            )
+        )
     }
 
     @Test

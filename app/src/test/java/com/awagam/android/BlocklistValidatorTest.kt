@@ -4,6 +4,7 @@
 package com.awagam.android
 
 import com.awagam.android.data.blocklist.BlocklistGroup
+import com.awagam.android.data.blocklist.BlocklistMetadata
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
@@ -452,6 +453,107 @@ class BlocklistValidatorTest {
         val result = BlocklistValidator.validateBlocklistFormat(groups)
         assertFalse(result.valid)
         assertTrue(result.error?.contains("missing required") == true)
+    }
+
+    // Tolerant Blocklist Validation Tests
+
+    private val mixedBlocklist = Json.parseToJsonElement(
+        """
+        {
+            "good": {
+                "name": "Good",
+                "context": "Kept as is",
+                "tlds": [".ru", "invalid-tld"],
+                "domains": ["example.com", "-invalid.com", 42, {"nested": true}],
+                "urls": ["example.org/path", "https://exa mple.org/"]
+            },
+            "nameless": {"tlds": [".cn"], "domains": ["nameless.com"]},
+            "blank": {"name": " ", "domains": ["blank.com"]},
+            "numeric": {"name": 1, "domains": ["numeric.com"]}
+        }
+        """
+    )
+
+    @Test
+    fun `invalid entries and nameless groups are skipped`() {
+        val result = BlocklistValidator.validateBlocklist(mixedBlocklist)
+        assertTrue(result.valid)
+        assertEquals(
+            mapOf(
+                "good" to BlocklistGroup(
+                    name = "Good",
+                    context = JsonPrimitive("Kept as is"),
+                    tlds = listOf(".ru"),
+                    domains = listOf("example.com"),
+                    urls = listOf("example.org/path")
+                )
+            ),
+            result.groups
+        )
+        assertEquals(
+            listOf(
+                "Invalid TLD in group \"good\": invalid-tld",
+                "Invalid domain in group \"good\": -invalid.com",
+                "Group \"good\".domains contains non-string item",
+                "Group \"good\".domains contains non-string item",
+                "Invalid URL in group \"good\": https://exa mple.org/",
+                "Group \"nameless\" missing required \"name\" field",
+                "Group \"blank\" missing required \"name\" field",
+                "Group \"numeric\" missing required \"name\" field"
+            ),
+            result.skipped
+        )
+    }
+
+    @Test
+    fun `counts include only the entries and groups that are kept`() {
+        val result = BlocklistValidator.validateBlocklist(mixedBlocklist)
+        assertEquals(BlocklistMetadata(totalRules = 3, tlds = 1, domains = 1, urls = 1, groups = 1), result.metadata)
+        assertEquals(5, result.skippedEntries)
+        assertEquals(3, result.skippedGroups)
+    }
+
+    @Test
+    fun `blocklists without invalid entries skip nothing`() {
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "tlds": [".ru"], "domains": ["example.com"]}}""")
+        )
+        assertTrue(result.valid)
+        assertEquals(emptyList<String>(), result.skipped)
+        assertEquals(2, result.metadata?.totalRules)
+    }
+
+    @Test
+    fun `blocklists whose entries are all invalid are accepted`() {
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "domains": ["-invalid.com"]}}""")
+        )
+        assertTrue(result.valid)
+        assertEquals(mapOf("g" to BlocklistGroup(name = "G")), result.groups)
+        assertEquals(0, result.metadata?.totalRules)
+    }
+
+    @Test
+    fun `group limit applies to the groups that are kept`() {
+        val groups = (0 until 100).associate { "g$it" to JsonObject(mapOf("name" to JsonPrimitive("G$it"))) }
+        val withNameless = JsonObject(groups + ("nameless" to JsonObject(emptyMap())))
+        assertTrue(BlocklistValidator.validateBlocklist(withNameless).valid)
+        val withExtra = JsonObject(groups + ("extra" to JsonObject(mapOf("name" to JsonPrimitive("Extra")))))
+        assertFalse(BlocklistValidator.validateBlocklist(withExtra).valid)
+    }
+
+    @Test
+    fun `structural errors fail validation`() {
+        for ((input, error) in listOf(
+            "[]" to "Root must be an object",
+            """{"g": "G"}""" to "Group \"g\" must be an object",
+            """{"g": {"name": "G", "domains": "example.com"}}""" to "Group \"g\".domains must be an array",
+            """{"g": {"name": "G", "urls": null}}""" to "Group \"g\".urls must be an array"
+        )) {
+            val result = BlocklistValidator.validateBlocklist(Json.parseToJsonElement(input))
+            assertFalse(input, result.valid)
+            assertEquals(error, result.error)
+        }
     }
 
     // Config Sanitization Tests
