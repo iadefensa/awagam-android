@@ -396,10 +396,10 @@ class BlocklistValidatorTest {
         assertFalse(BlocklistValidator.validateSize(largeContent))
     }
 
-    // Blocklist Format Validation Tests
+    // Strict Blocklist Validation Tests
 
     @Test
-    fun `A blocklist whose only group is named imports validates as a blocklist`() {
+    fun `Strict validation accepts a blocklist whose only group is named imports`() {
         // The bundle format is disambiguated by type—“imports” as a group
         // (an object) must keep working as a plain blocklist
         val groups = mapOf(
@@ -415,7 +415,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Valid blocklist format passes`() {
+    fun `Strict validation passes a valid blocklist`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -435,7 +435,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Blocklist with invalid TLD fails validation`() {
+    fun `Strict validation fails on an invalid TLD`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -449,7 +449,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Blocklist with invalid domain fails validation`() {
+    fun `Strict validation fails on an invalid domain`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -463,7 +463,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Blocklist with missing name fails validation`() {
+    fun `Strict validation fails on a missing name`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "", // Empty name
@@ -575,7 +575,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Structural errors fail validation`() {
+    fun `Tolerant validation still fails on structural errors`() {
         for ((input, error) in listOf(
             "[]" to "Root must be an object",
             """{"g": "G"}""" to "Group \"g\" must be an object",
