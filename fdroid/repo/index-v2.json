@@ -14,7 +14,7 @@
       }
     },
     "address": "https://iadefensa.github.io/awagam-android/fdroid/repo",
-    "timestamp": 1791206916000,
+    "timestamp": 1791382556000,
     "categories": {
       "Internet": {
         "name": {
@@ -31,14 +31,14 @@
   "packages": {
     "com.awagam.android": {
       "metadata": {
-        "added": 1791206914000,
+        "added": 1791382554000,
         "categories": [
           "Security",
           "Internet"
         ],
         "changelog": "https://github.com/iadefensa/awagam-android/blob/main/CHANGELOG.md",
         "issueTracker": "https://github.com/iadefensa/awagam-android/issues",
-        "lastUpdated": 1791206914000,
+        "lastUpdated": 1791382555000,
         "license": "GPL-3.0-or-later",
         "sourceCode": "https://github.com/iadefensa/awagam-android",
         "webSite": "https://iadefensa.com/solutions/awagam-android/",
@@ -101,8 +101,64 @@
         "preferredSigner": "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
       },
       "versions": {
+        "80a2bef360e83e44720f7b08f9a079b3a524864a79ba40016ce62d497b00e649": {
+          "added": 1791382555000,
+          "file": {
+            "name": "/awagam-1.0.2.apk",
+            "sha256": "80a2bef360e83e44720f7b08f9a079b3a524864a79ba40016ce62d497b00e649",
+            "size": 4096897
+          },
+          "manifest": {
+            "nativecode": [
+              "arm64-v8a",
+              "armeabi-v7a",
+              "x86",
+              "x86_64"
+            ],
+            "versionName": "1.0.2",
+            "versionCode": 4,
+            "usesSdk": {
+              "minSdkVersion": 28,
+              "targetSdkVersion": 36
+            },
+            "signer": {
+              "sha256": [
+                "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
+              ]
+            },
+            "usesPermission": [
+              {
+                "name": "android.permission.INTERNET"
+              },
+              {
+                "name": "android.permission.ACCESS_NETWORK_STATE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+              },
+              {
+                "name": "android.permission.POST_NOTIFICATIONS"
+              },
+              {
+                "name": "android.permission.RECEIVE_BOOT_COMPLETED"
+              },
+              {
+                "name": "android.permission.WAKE_LOCK"
+              },
+              {
+                "name": "com.awagam.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+              }
+            ]
+          },
+          "whatsNew": {
+            "en-US": "• Fixed internationalized domains with characters like “ß” not being blocked\n• Fixed Pi-hole export, whose TLD rules Pi-hole rejected in lists and whose domain rules missed subdomains\n• Fixed Pi-hole and AdGuard Home exports containing URL rules those tools can’t apply\n• Updated invalid blocklist entries and groups without a name to be skipped with a warning instead of failing the whole blocklist"
+          }
+        },
         "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e": {
-          "added": 1791206914000,
+          "added": 1791382555000,
           "file": {
             "name": "/awagam-1.0.1.apk",
             "sha256": "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e",
@@ -158,7 +214,7 @@
           }
         },
         "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d": {
-          "added": 1791206914000,
+          "added": 1791382554000,
           "file": {
             "name": "/awagam-1.0.0.apk",
             "sha256": "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d",
