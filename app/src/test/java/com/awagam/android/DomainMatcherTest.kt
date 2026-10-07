@@ -3,15 +3,21 @@
 
 package com.awagam.android
 
+import android.app.Application
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import com.awagam.android.data.blocklist.DomainMatcher
 
 /**
  * Unit tests for domain/TLD matching logic.
- * Tests the core blocking functionality without Android dependencies.
+ * Runs on Robolectric for the platform’s UTS #46 IDNA implementation.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class DomainMatcherTest {
 
     private lateinit var matcher: TestDomainMatcher
@@ -108,6 +114,27 @@ class DomainMatcherTest {
         matcher.addDomain("münchen.de")
         // Should be stored as punycode
         assertTrue(matcher.isBlocked("xn--mnchen-3ya.de"))
+    }
+
+    @Test
+    fun `deviation characters are kept as browsers resolve them (UTS 46 nontransitional)`() {
+        matcher.addDomain("straße.de")
+        assertTrue(matcher.isBlocked("xn--strae-oqa.de"))
+        assertTrue(matcher.isBlocked("straße.de"))
+        assertFalse(matcher.isBlocked("strasse.de"))
+    }
+
+    @Test
+    fun `hyphens in third and fourth position are accepted`() {
+        matcher.addDomain("r3---sn-abc.googlevideo.com")
+        assertTrue(matcher.isBlocked("r3---sn-abc.googlevideo.com"))
+        assertEquals("r3---sn-abc.googlevideo.com", DomainMatcher.toAscii("r3---sn-abc.googlevideo.com"))
+    }
+
+    @Test
+    fun `unicode TLD converted to punycode`() {
+        matcher.addTld(".рф")
+        assertTrue(matcher.isBlocked("example.xn--p1ai"))
     }
 
     // Edge Cases

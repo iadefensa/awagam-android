@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [1.0.2] - 2026-10-07
 
+### Fixed
+
+* Fixed internationalized domains with characters like “ß” not being blocked, by converting them the way browsers do (UTS #46)
+* Fixed Pi-hole export, whose TLD rules Pi-hole rejected in lists and whose domain rules missed subdomains (entries now use ABP-style syntax)
+* Fixed Pi-hole and AdGuard Home exports containing URL rules those tools can’t apply (URLs are now listed as skipped, like in the hosts export)
+
 ### Changed
 
 * Updated invalid blocklist entries and groups without a name to be skipped with a warning instead of failing the whole blocklist

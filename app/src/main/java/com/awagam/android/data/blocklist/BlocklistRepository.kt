@@ -36,7 +36,7 @@ class BlocklistRepository(private val context: Context) {
     private var matcher: DomainMatcher = DomainMatcher.EMPTY
 
     @Volatile
-    private var blockedUrls: Set<String> = emptySet() // For export to Pi-hole/AdGuard
+    private var blockedUrls: Set<String> = emptySet() // Listed (not applied) in exports
 
     private val _blocklistStats = MutableStateFlow(BlocklistStats())
     val blocklistStats: StateFlow<BlocklistStats> = _blocklistStats.asStateFlow()
@@ -103,8 +103,7 @@ class BlocklistRepository(private val context: Context) {
                 group.tlds.forEach { builder.addTld(it) }
                 group.domains.forEach { builder.addDomain(it) }
 
-                // Store URLs for export to Pi-hole/AdGuard
-                // (URLs can’t be blocked at DNS level, but other tools can use them)
+                // URLs can’t be blocked at DNS level, so they’re only kept to be listed in exports
                 group.urls.forEach { urls.add(it.trim()) }
             }
 
@@ -132,7 +131,7 @@ class BlocklistRepository(private val context: Context) {
     fun getBlockedDomains(): Set<String> = matcher.domains
 
     /**
-     * Get all blocked URLs for export (for Pi-hole/AdGuard).
+     * Get all blocked URLs, to be listed in exports.
      */
     fun getBlockedUrls(): Set<String> = blockedUrls.toSet()
 }

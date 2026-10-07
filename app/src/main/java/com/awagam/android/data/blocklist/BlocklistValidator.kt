@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import java.net.IDN
 import java.net.InetAddress
 import java.net.URL
 
@@ -503,7 +502,7 @@ object BlocklistValidator {
 
         return try {
             // Try to convert to punycode - this validates IDN
-            val ascii = IDN.toASCII(domain.lowercase().trim())
+            val ascii = DomainMatcher.toAscii(domain.lowercase().trim()) ?: return false
 
             // Validate the ASCII result
             val labels = ascii.split(".")

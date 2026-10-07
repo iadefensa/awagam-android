@@ -3,6 +3,7 @@
 
 package com.awagam.android
 
+import android.app.Application
 import com.awagam.android.data.blocklist.BlocklistGroup
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import kotlinx.coroutines.test.runTest
@@ -12,6 +13,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -19,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * Verifies that hosting-platform blob URLs are correctly converted to direct
  * download URLs, and that bundle imports are merged with collision-safe group IDs.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class ExternalBlocklistManagerTest {
 
     // GitHub

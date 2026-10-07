@@ -3,7 +3,7 @@
 
 package com.awagam.android.data.blocklist
 
-import java.net.IDN
+import android.icu.text.IDNA
 
 /**
  * Immutable set of blocking rules, matched against query hostnames.
@@ -47,13 +47,27 @@ class DomainMatcher(
         fun normalizeTld(tld: String): String =
             ".${normalizeDomain(tld.trim().removePrefix("."))}"
 
+        // UTS #46 nontransitional processing, as browsers use (keeps “ß” instead of mapping it to “ss”)
+        private val idna: IDNA = IDNA.getUTS46Instance(IDNA.NONTRANSITIONAL_TO_ASCII)
+
+        // Browsers skip hyphen checks (CheckHyphens=false), and CDN hosts like "r3---sn-abc.googlevideo.com" rely on that
+        private val ignoredIdnaErrors = setOf(
+            IDNA.Error.HYPHEN_3_4,
+            IDNA.Error.LEADING_HYPHEN,
+            IDNA.Error.TRAILING_HYPHEN
+        )
+
+        /** Converts a domain to its ASCII (punycode) form, or returns null if it isn’t a valid IDN. */
+        fun toAscii(domain: String): String? {
+            val info = IDNA.Info()
+            val ascii = StringBuilder()
+            idna.nameToASCII(domain, ascii, info)
+            return if ((info.errors - ignoredIdnaErrors).isEmpty()) ascii.toString() else null
+        }
+
         fun normalizeDomain(domain: String): String {
             val trimmed = domain.lowercase().trim().trimEnd('.')
-            return try {
-                IDN.toASCII(trimmed)
-            } catch (e: Exception) {
-                trimmed
-            }
+            return toAscii(trimmed) ?: trimmed
         }
 
         val EMPTY = DomainMatcher(emptySet(), emptySet())

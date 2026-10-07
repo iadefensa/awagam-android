@@ -3,6 +3,7 @@
 
 package com.awagam.android
 
+import android.app.Application
 import com.awagam.android.data.blocklist.BlocklistGroup
 import com.awagam.android.data.blocklist.BlocklistMetadata
 import com.awagam.android.data.blocklist.BlocklistValidator
@@ -14,12 +15,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.net.InetAddress
 
 /**
  * Unit tests for BlocklistValidator.
  * Tests URL validation, TLD/domain format validation, and security checks.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class BlocklistValidatorTest {
 
     // URL Validation Tests
@@ -276,6 +282,13 @@ class BlocklistValidatorTest {
         assertTrue(BlocklistValidator.isValidDomain("münchen.de"))
         assertTrue(BlocklistValidator.isValidDomain("xn--mnchen-3ya.de")) // Punycode
         assertTrue(BlocklistValidator.isValidDomain("example.рф"))
+        assertTrue(BlocklistValidator.isValidDomain("straße.de"))
+        assertTrue(BlocklistValidator.isValidDomain("r3---sn-abc.googlevideo.com"))
+    }
+
+    @Test
+    fun `IDN domains with overlong labels are rejected`() {
+        assertFalse(BlocklistValidator.isValidDomain("${"ü".repeat(64)}.de"))
     }
 
     @Test

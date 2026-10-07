@@ -84,23 +84,22 @@ class BlocklistExporter(private val context: Context) {
     }
 
     /**
-     * Pi-hole format: one domain per line.
-     * TLDs are converted to regex patterns.
-     * URLs are converted to regex patterns for path matching.
+     * Pi-hole list format with ABP-style entries, which (unlike plain domains or
+     * regexes in lists) Pi-hole applies to subdomains.
+     * URLs are listed as comments only, since Pi-hole can’t match paths.
      */
     private fun generatePihole(domains: Set<String>, tlds: Set<String>, urls: Set<String>): String {
         val lines = mutableListOf<String>()
         lines.add("# AWAGAM Blocklist for Pi-hole")
         lines.add("# Generated: ${Date()}")
         lines.add("# Domains: ${domains.size}, TLDs: ${tlds.size}, URLs: ${urls.size}")
+        lines.add("# Add as a list in Pi-hole; each entry also blocks its subdomains")
         lines.add("")
 
         if (tlds.isNotEmpty()) {
-            lines.add("# TLDs (use regex or wildcard patterns in Pi-hole)")
+            lines.add("# TLDs")
             tlds.sorted().forEach { tld ->
-                // Pi-hole regex format for TLD blocking
-                val cleanTld = tld.removePrefix(".")
-                lines.add("(^|\\.)$cleanTld\$")
+                lines.add("||${tld.removePrefix(".")}^")
             }
             lines.add("")
         }
@@ -108,22 +107,15 @@ class BlocklistExporter(private val context: Context) {
         if (domains.isNotEmpty()) {
             lines.add("# Domains")
             domains.sorted().forEach { domain ->
-                lines.add(domain)
+                lines.add("||$domain^")
             }
             lines.add("")
         }
 
         if (urls.isNotEmpty()) {
-            lines.add("# URLs (Pi-hole can use regex patterns for path matching)")
+            lines.add("# URLs (${urls.size})—not included, Pi-hole only matches domains")
             urls.sorted().forEach { url ->
-                // Extract domain from URL for basic blocking
-                val domain = extractDomainFromUrl(url)
-                if (domain != null) {
-                    // Create regex pattern that matches the URL path
-                    val pattern = urlToRegex(url)
-                    lines.add("# URL: $url")
-                    lines.add(pattern)
-                }
+                lines.add("# Skipped URL: $url")
             }
         }
 
@@ -132,7 +124,7 @@ class BlocklistExporter(private val context: Context) {
 
     /**
      * AdGuard Home format: ||domain^ syntax.
-     * URLs are converted to AdGuard filter syntax.
+     * URLs are listed as comments only, since AdGuard Home can’t match paths.
      */
     private fun generateAdGuard(domains: Set<String>, tlds: Set<String>, urls: Set<String>): String {
         val lines = mutableListOf<String>()
@@ -160,11 +152,9 @@ class BlocklistExporter(private val context: Context) {
         }
 
         if (urls.isNotEmpty()) {
-            lines.add("! URLs")
+            lines.add("! URLs (${urls.size})—not included, AdGuard Home only matches domains")
             urls.sorted().forEach { url ->
-                // AdGuard supports URL patterns directly
-                val pattern = urlToAdGuardPattern(url)
-                lines.add(pattern)
+                lines.add("! Skipped URL: $url")
             }
         }
 
@@ -180,7 +170,7 @@ class BlocklistExporter(private val context: Context) {
         lines.add("# AWAGAM Blocklist (hosts format)")
         lines.add("# Generated: ${Date()}")
         lines.add("# Domains: ${domains.size}")
-        lines.add("# Note: TLDs and URLs cannot be blocked via hosts file")
+        lines.add("# Note: TLDs and URLs cannot be blocked via hosts file, and subdomains other than “www” aren’t covered")
         lines.add("")
 
         if (tlds.isNotEmpty()) {
@@ -208,57 +198,5 @@ class BlocklistExporter(private val context: Context) {
         }
 
         return lines.joinToString("\n")
-    }
-
-    /**
-     * Extract domain from a URL string.
-     */
-    private fun extractDomainFromUrl(url: String): String? {
-        return try {
-            val cleaned = url
-                .removePrefix("https://")
-                .removePrefix("http://")
-            val slashIndex = cleaned.indexOf('/')
-            val queryIndex = cleaned.indexOf('?')
-            val endIndex = when {
-                slashIndex >= 0 && queryIndex >= 0 -> minOf(slashIndex, queryIndex)
-                slashIndex >= 0 -> slashIndex
-                queryIndex >= 0 -> queryIndex
-                else -> cleaned.length
-            }
-            cleaned.substring(0, endIndex).takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Convert URL to Pi-hole regex pattern.
-     */
-    private fun urlToRegex(url: String): String {
-        val cleaned = url
-            .removePrefix("https://")
-            .removePrefix("http://")
-        // Escape special regex characters and convert wildcards
-        val escaped = cleaned
-            .replace(".", "\\.")
-            .replace("*", ".*")
-            .replace("?", "\\?")
-        return "^(https?://)?$escaped"
-    }
-
-    /**
-     * Convert URL to AdGuard filter pattern.
-     */
-    private fun urlToAdGuardPattern(url: String): String {
-        val cleaned = url
-            .removePrefix("https://")
-            .removePrefix("http://")
-        // AdGuard uses `||` for domain start and `^` for separator
-        return if (cleaned.contains("/") || cleaned.contains("?")) {
-            "||$cleaned"
-        } else {
-            "||$cleaned^"
-        }
     }
 }
