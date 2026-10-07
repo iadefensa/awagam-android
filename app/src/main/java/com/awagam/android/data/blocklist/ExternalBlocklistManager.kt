@@ -156,10 +156,6 @@ class ExternalBlocklistManager(private val context: Context) {
             isLenient = true
         }
 
-        // Number of skipped entries named in a warning—stored warnings are
-        // truncated anyway, and a broken blocklist may have thousands
-        private const val MAX_LISTED_SKIP_DETAILS = 10
-
         /**
          * Build the warning for a refresh that skipped bundle imports, invalid
          * entries, or groups without a name, or null if nothing was skipped.
@@ -182,8 +178,9 @@ class ExternalBlocklistManager(private val context: Context) {
             )
             if (summaries.isEmpty()) return null
 
-            val listedDetails = skipDetails.take(MAX_LISTED_SKIP_DETAILS) +
-                listOfNotNull("…".takeIf { skipDetails.size > MAX_LISTED_SKIP_DETAILS })
+            // Details are capped where collected, so omissions are judged by the counts
+            val listed = skipDetails.take(BlocklistValidator.MAX_LISTED_SKIP_DETAILS)
+            val listedDetails = listed + listOfNotNull("…".takeIf { skippedEntries + skippedGroups > listed.size })
             val details = (importFailures + listedDetails).joinToString("; ")
             return "${summaries.joinToString(", ")}: $details"
         }
@@ -329,7 +326,9 @@ class ExternalBlocklistManager(private val context: Context) {
                     }
                     skippedEntries += validation.skippedEntries
                     skippedGroups += validation.skippedGroups
-                    validation.skipped.forEach { skipDetails.add("${entry.importUrl}: $it") }
+                    validation.skipped
+                        .take(BlocklistValidator.MAX_LISTED_SKIP_DETAILS - skipDetails.size)
+                        .forEach { skipDetails.add("${entry.importUrl}: $it") }
                     validation.groups
                 } catch (e: Exception) {
                     failures.add("${entry.importUrl} (${e.message ?: e.javaClass.simpleName})")

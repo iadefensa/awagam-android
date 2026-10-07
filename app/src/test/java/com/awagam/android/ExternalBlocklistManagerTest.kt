@@ -5,6 +5,7 @@ package com.awagam.android
 
 import android.app.Application
 import com.awagam.android.data.blocklist.BlocklistGroup
+import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -237,6 +238,13 @@ class ExternalBlocklistManagerTest {
         assertFalse(warning, warning.contains("entry10"))
     }
 
+    @Test
+    fun `skip warnings mark omitted details based on counts, not listed details`() {
+        val details = (0 until 10).map { "entry$it" }
+        assertTrue(ExternalBlocklistManager.skipWarning(25, 0, details)!!.endsWith("entry9; …"))
+        assertTrue(ExternalBlocklistManager.skipWarning(10, 0, details)!!.endsWith("entry9"))
+    }
+
     // Bundle Resolution
 
     private fun bundleOf(vararg urls: String) = Json.parseToJsonElement(
@@ -385,6 +393,19 @@ class ExternalBlocklistManagerTest {
                     "https://a.example/mixed.json: Invalid domain in group \"ads\": -invalid.com; "
             )
         )
+    }
+
+    @Test
+    fun `bundle skip details are capped across imports while counts stay exact`() = runTest {
+        val bundle = bundleOf("https://a.example/one.json", "https://a.example/two.json")
+        val invalidDomains = (0 until 8).joinToString(",") { "\"-bad$it.com\"" }
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) {
+            """{"ads": {"name": "Ads", "domains": ["ads.example.net", $invalidDomains]}}"""
+        }
+        val warning = resolved.warning!!
+        assertTrue(warning, warning.startsWith("16 invalid entries skipped: "))
+        assertEquals(warning, BlocklistValidator.MAX_LISTED_SKIP_DETAILS, Regex("Invalid domain").findAll(warning).count())
+        assertTrue(warning, warning.endsWith("; …"))
     }
 
     @Test

@@ -47,8 +47,11 @@ class DomainMatcher(
         fun normalizeTld(tld: String): String =
             ".${normalizeDomain(tld.trim().removePrefix("."))}"
 
-        // UTS #46 nontransitional processing, as browsers use (keeps “ß” instead of mapping it to “ss”)
-        private val idna: IDNA = IDNA.getUTS46Instance(IDNA.NONTRANSITIONAL_TO_ASCII)
+        // UTS #46 as browsers apply it: nontransitional (keeps “ß” instead of mapping
+        // it to “ss”), with BiDi and ContextJ checks
+        private val idna: IDNA = IDNA.getUTS46Instance(
+            IDNA.NONTRANSITIONAL_TO_ASCII or IDNA.CHECK_BIDI or IDNA.CHECK_CONTEXTJ
+        )
 
         // Browsers skip hyphen checks (CheckHyphens=false), and CDN hosts like "r3---sn-abc.googlevideo.com" rely on that
         private val ignoredIdnaErrors = setOf(

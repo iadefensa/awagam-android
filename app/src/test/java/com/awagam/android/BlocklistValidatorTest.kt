@@ -287,6 +287,14 @@ class BlocklistValidatorTest {
     }
 
     @Test
+    fun `IDN domains failing browser BiDi or ContextJ rules are rejected`() {
+        assertFalse(BlocklistValidator.isValidDomain("0a.\u05D0")) // Leading digit in a BiDi domain
+        assertFalse(BlocklistValidator.isValidDomain("a\u200Cb.com")) // ZWNJ outside its allowed context
+        assertTrue(BlocklistValidator.isValidDomain("\u05D0\u05D1.com")) // Hebrew label
+        assertTrue(BlocklistValidator.isValidDomain("\u0915\u094D\u200C\u0937.com")) // ZWNJ after virama
+    }
+
+    @Test
     fun `IDN domains with overlong labels are rejected`() {
         assertFalse(BlocklistValidator.isValidDomain("${"ü".repeat(64)}.de"))
     }
@@ -524,6 +532,17 @@ class BlocklistValidatorTest {
         assertEquals(BlocklistMetadata(totalRules = 3, tlds = 1, domains = 1, urls = 1, groups = 1), result.metadata)
         assertEquals(5, result.skippedEntries)
         assertEquals(3, result.skippedGroups)
+    }
+
+    @Test
+    fun `skip details are capped at the display limit while counts stay exact`() {
+        val invalidTlds = (0 until 25).joinToString(",") { "\"bad tld $it\"" }
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "tlds": [$invalidTlds]}}""")
+        )
+        assertEquals(25, result.skippedEntries)
+        assertEquals(BlocklistValidator.MAX_LISTED_SKIP_DETAILS, result.skipped.size)
+        assertEquals("Invalid TLD in group \"g\": bad tld 0", result.skipped.first())
     }
 
     @Test

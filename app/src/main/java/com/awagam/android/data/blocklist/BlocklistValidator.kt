@@ -30,6 +30,10 @@ object BlocklistValidator {
     private const val MAX_DNS_LABEL_LENGTH = 63
     private const val MAX_DOMAIN_LENGTH = 253
 
+    // Number of skipped entries named in a warning—a broken blocklist may have
+    // hundreds of thousands, so only these are kept while all are counted
+    internal const val MAX_LISTED_SKIP_DETAILS = 10
+
     /**
      * Validation result with optional error message and metadata. Results of
      * `[validateBlocklist]` also carry the kept groups and what was skipped.
@@ -39,6 +43,7 @@ object BlocklistValidator {
         val error: String? = null,
         val metadata: BlocklistMetadata? = null,
         val groups: Map<String, BlocklistGroup>? = null,
+        /** At most [MAX_LISTED_SKIP_DETAILS]; the counts below include all */
         val skipped: List<String> = emptyList(),
         val skippedEntries: Int = 0,
         val skippedGroups: Int = 0
@@ -344,7 +349,9 @@ object BlocklistValidator {
 
             val name = (groupElement["name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             if (name.isNullOrBlank()) {
-                skipped.add("Group \"$groupId\" missing required \"name\" field")
+                if (skipped.size < MAX_LISTED_SKIP_DETAILS) {
+                    skipped.add("Group \"$groupId\" missing required \"name\" field")
+                }
                 skippedGroups++
                 continue
             }
@@ -357,16 +364,18 @@ object BlocklistValidator {
                 }
                 fields[field] = fieldElement.mapNotNull { item ->
                     val value = (item as? JsonPrimitive)?.takeIf { it.isString }?.content
-                    val error = if (value == null) {
-                        "Group \"$groupId\".$field contains non-string item"
-                    } else {
-                        entryError(field, value, groupId)
-                    }
-                    if (error != null) {
-                        skipped.add(error)
+                    val valid = value != null && entryError(field, value, groupId) == null
+                    if (!valid) {
+                        // Messages are only built for entries that will be listed
+                        if (skipped.size < MAX_LISTED_SKIP_DETAILS) {
+                            skipped.add(
+                                if (value == null) "Group \"$groupId\".$field contains non-string item"
+                                else entryError(field, value, groupId)!!
+                            )
+                        }
                         skippedEntries++
                     }
-                    value.takeIf { error == null }
+                    value.takeIf { valid }
                 }
             }
 

@@ -21,7 +21,7 @@ Visit IA Defensa for [general information about this app](https://iadefensa.com/
 ./gradlew assembleDebug
 ```
 
-Output: `app/build/outputs/apk/debug/awagam-*.apk`
+Output: `app/build/outputs/apk/debug/awagam-debug.apk`, plus a versioned copy, `awagam-<version>.apk`
 
 Debug builds are not minified and keep debug logging, so they don’t reflect what ships. Verify behavior against a release build before distributing.
 
@@ -83,7 +83,7 @@ Build the release:
 ```
 
 Output:
-* APK: `app/build/outputs/apk/release/awagam-*.apk`
+* APK: `app/build/outputs/apk/release/awagam-release.apk`, plus a versioned copy, `awagam-<version>.apk`
 * AAB: `app/build/outputs/bundle/release/awagam-release.aab`
 
 Each release after the first needs `versionCode` incremented in `app/build.gradle.kts`; Android refuses to install a build whose `versionCode` is not higher than the installed one. That `versionCode` also needs an entry under `Builds` in `fdroid/metadata/com.awagam.android.yml`; without one, `fdroid update` leaves the release notes out of the index current F-Droid clients read.
@@ -91,7 +91,7 @@ Each release after the first needs `versionCode` incremented in `app/build.gradl
 ### Running on a Device
 
 ```shell
-./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/awagam-*.apk
+./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/awagam-release.apk
 ```
 
 `-r` replaces the installed app while preserving its configuration. Switching signing keys requires `adb uninstall com.awagam.android` first, as Android rejects an update signed with a different key. Expect to grant VPN consent again after reinstalling.
