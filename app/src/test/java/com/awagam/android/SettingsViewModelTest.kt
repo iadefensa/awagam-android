@@ -70,11 +70,9 @@ class SettingsViewModelTest {
 
     // Helper Methods
 
-    /**
-     * Store a blocklist, then read the export the settings screen would show.
-     * The ViewModel goes through a store so clearing it cancels the collectors
-     * its `init` starts, which would otherwise outlive the test.
-     */
+    // Store a blocklist, then read the export the settings screen would show.
+    // The ViewModel goes through a store so clearing it cancels the collectors
+    // its `init` starts, which would otherwise outlive the test.
     private fun exportWith(config: ExternalBlocklistConfig): String {
         runBlocking { ExternalBlocklistManager(app).addBlocklist(config) }
 

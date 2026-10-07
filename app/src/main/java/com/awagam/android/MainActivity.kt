@@ -117,10 +117,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Ask for notification access the first time the user turns protection on,
-     * so the request has visible context rather than firing at cold start.
-     */
+    // Ask for notification access the first time the user turns protection on,
+    // so the request has visible context rather than firing at cold start
     private fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)

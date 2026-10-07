@@ -534,10 +534,8 @@ fun SettingsScreen(
     }
 }
 
-/**
- * Render the stored UTC timestamp in local time, so a list that silently stopped
- * refreshing is visible rather than a matter of trust.
- */
+// Render the stored UTC timestamp in local time, so a list that silently stopped
+// refreshing is visible rather than a matter of trust
 private fun formatLastUpdated(lastUpdated: String?): String {
     if (lastUpdated == null) return "Never refreshed"
 
@@ -556,10 +554,8 @@ private fun formatLastUpdated(lastUpdated: String?): String {
     }
 }
 
-/**
- * Heading that opens a settings section, including the gap that separates it
- * from the section before.
- */
+// Heading that opens a settings section, including the gap that separates it
+// from the section before
 @Composable
 private fun SectionHeader(title: String, description: String) {
     Spacer(modifier = Modifier.height(8.dp))
@@ -789,11 +785,9 @@ private fun EditBlocklistDialog(
     )
 }
 
-/**
- * Confirm a deletion, which nothing takes back: The entry is removed from the
- * store and its cache dropped, so what is shown here is what it costs to undo
- * by hand.
- */
+// Confirm a deletion, which nothing takes back: The entry is removed from the
+// store and its cache dropped, so what is shown here is what it costs to undo
+// by hand
 @Composable
 private fun DeleteBlocklistDialog(
     blocklist: ExternalBlocklistConfig,
@@ -813,7 +807,7 @@ private fun DeleteBlocklistDialog(
                 // Adding the list back takes its URL, and once the entry is gone
                 // the app holds it nowhere else. Capped like the card’s error
                 // text: A long URL breaks anywhere, so left free it would push
-                // the buttons off a short screen
+                // the buttons off a short screen.
                 Text(
                     text = blocklist.url,
                     style = MaterialTheme.typography.bodySmall,
@@ -906,10 +900,8 @@ private fun ImportExportDialog(
     )
 }
 
-/**
- * Pick the upstream resolver. Scrollable because the list outgrows a dialog on
- * smaller screens, and selecting closes it—there is nothing to confirm.
- */
+// Pick the upstream resolver. Scrollable because the list outgrows a dialog on
+// smaller screens, and selecting closes it—there is nothing to confirm.
 @Composable
 private fun DnsProviderDialog(
     selected: DnsProvider,

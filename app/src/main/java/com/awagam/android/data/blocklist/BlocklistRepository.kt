@@ -66,7 +66,7 @@ class BlocklistRepository(private val context: Context) {
         Log.d(TAG, "Loaded ${loaded.tldCount} TLDs, ${loaded.domainCount} domains, ${blockedUrls.size} URLs")
     }
 
-    /** Returns the number of external sources that loaded successfully. */
+    // Returns the number of external sources that loaded successfully
     private suspend fun loadExternalBlocklists(
         builder: DomainMatcher.Companion.Builder,
         urls: MutableSet<String>
@@ -87,10 +87,8 @@ class BlocklistRepository(private val context: Context) {
         return count
     }
 
-    /**
-     * Returns true if the source parsed. An empty but valid list still counts as a
-     * source—a user’s list may legitimately be empty.
-     */
+    // Returns true if the source parsed. An empty but valid list still counts as a
+    // source—a user’s list may legitimately be empty.
     private fun parseBlocklist(
         jsonString: String,
         builder: DomainMatcher.Companion.Builder,

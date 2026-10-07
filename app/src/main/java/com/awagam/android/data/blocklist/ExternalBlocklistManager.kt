@@ -56,7 +56,7 @@ class ExternalBlocklistManager(private val context: Context) {
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         // Bundle imports are fetched concurrently in batches within an overall
-        // deadline, so a bundle with many slow or dead imports can't stall the
+        // deadline, so a bundle with many slow or dead imports can’t stall the
         // periodic worker past its execution window
         private const val BUNDLE_FETCH_CONCURRENCY = 5
         private val BUNDLE_FETCH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(5)
@@ -262,7 +262,7 @@ class ExternalBlocklistManager(private val context: Context) {
                             // with no suspension points, so `withTimeoutOrNull` alone can’t cut
                             // it off—cancellation is cooperative and only checked at suspension
                             // points. `runInterruptible` bridges that: on timeout it interrupts
-                            // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor
+                            // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor.
                             var body: String? = null
                             var error: String? = null
                             for (attempt in 1..BUNDLE_IMPORT_MAX_ATTEMPTS) {
@@ -385,9 +385,7 @@ class ExternalBlocklistManager(private val context: Context) {
         .followSslRedirects(false)
         .build()
 
-    /**
-     * System DNS restricted to publicly routable results.
-     */
+    // System DNS restricted to publicly routable results
     private fun publicOnlyDns(): Dns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
             val addresses = Dns.SYSTEM.lookup(hostname)
@@ -600,10 +598,8 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Fetch URL with fallbacks for GitHub URLs.
-     * Tries: 1) Raw URL, 2) jsDelivr CDN, 3) GitHub API (base64 decode)
-     */
+    // Fetch URL with fallbacks for GitHub URLs.
+    // Tries: 1) Raw URL, 2) jsDelivr CDN, 3) GitHub API (base64 decode).
     private fun fetchWithFallbacks(primaryUrl: String, originalUrl: String): String {
         val errors = mutableListOf<String>()
 
@@ -650,9 +646,7 @@ class ExternalBlocklistManager(private val context: Context) {
         throw Exception("All fetch methods failed: ${errors.joinToString(", ")}")
     }
 
-    /**
-     * Fetch content from GitHub API and decode base64.
-     */
+    // Fetch content from GitHub API and decode base64
     private fun fetchGitHubApi(apiUrl: String): String? {
         val request = Request.Builder()
             .url(apiUrl)
@@ -680,9 +674,7 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Fetch a URL and return its body, or null if not successful.
-     */
+    // Fetch a URL and return its body, or null if not successful
     private fun fetchUrl(url: String): String? {
         val request = Request.Builder()
             .url(url)
@@ -705,11 +697,9 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Read a response body, refusing anything over [MAX_BLOCKLIST_SIZE].
-     * The declared content length can’t be relied on—a chunked response reports
-     * none, so the cap has to hold while reading rather than before it.
-     */
+    // Read a response body, refusing anything over `MAX_BLOCKLIST_SIZE`.
+    // The declared content length can’t be relied on—a chunked response reports
+    // none, so the cap has to hold while reading rather than before it.
     private fun readCapped(body: ResponseBody): String {
         val source = body.source()
         if (source.request(MAX_BLOCKLIST_SIZE + 1L)) {
@@ -731,14 +721,12 @@ class ExternalBlocklistManager(private val context: Context) {
         refreshBlocklists { true }
     }
 
-    /**
-     * Refresh the enabled blocklists matching (`shouldRefresh`), least recently
-     * attempted first, within one shared time budget—so several bad bundles
-     * can’t each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively
-     * run the periodic worker past its execution window, and a chronically
-     * slow or failing blocklist can’t claim the budget every pass and starve
-     * the configs after it.
-     */
+    // Refresh the enabled blocklists matching (`shouldRefresh`), least recently
+    // attempted first, within one shared time budget—so several bad bundles
+    // can’t each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively
+    // run the periodic worker past its execution window, and a chronically
+    // slow or failing blocklist can’t claim the budget every pass and starve
+    // the configs after it
     private suspend fun refreshBlocklists(shouldRefresh: (ExternalBlocklistConfig) -> Boolean) {
         val deadline = System.currentTimeMillis() + TOTAL_REFRESH_TIME_BUDGET_MS
         val configs = getConfigsSnapshot()
@@ -770,19 +758,17 @@ class ExternalBlocklistManager(private val context: Context) {
         migrateCacheFromPreferences(id)
     }
 
-    /**
-     * Where a blocklist’s rules are stored. Bodies live in files rather than in
-     * the preferences DataStore: that store is read and rewritten in full on
-     * every access, so keeping multi-megabyte lists in it would churn tens of
-     * megabytes for something as small as toggling one list on or off.
-     *
-     * IDs come from imported configs and are not trustworthy as file names, so
-     * the name is sanitized and disambiguated with a digest of the original.
-     * The digest is a cryptographic one because sanitizing is lossy: two IDs
-     * that differ only in stripped characters must not share a file, and
-     * `hashCode` collisions are easy enough to construct for an imported
-     * config to overwrite another list’s rules.
-     */
+    // Where a blocklist’s rules are stored. Bodies live in files rather than in
+    // the preferences DataStore: that store is read and rewritten in full on
+    // every access, so keeping multi-megabyte lists in it would churn tens of
+    // megabytes for something as small as toggling one list on or off.
+    //
+    // IDs come from imported configs and are not trustworthy as file names, so
+    // the name is sanitized and disambiguated with a digest of the original.
+    // The digest is a cryptographic one because sanitizing is lossy: two IDs
+    // that differ only in stripped characters must not share a file, and
+    // `hashCode` collisions are easy enough to construct for an imported
+    // config to overwrite another list’s rules.
     private fun cacheFile(id: String): File {
         val dir = File(context.filesDir, CACHE_DIR_NAME)
         val safeId = id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(64)
@@ -793,11 +779,9 @@ class ExternalBlocklistManager(private val context: Context) {
         return File(dir, "$safeId-$digest.json")
     }
 
-    /**
-     * Write a blocklist body, replacing any previous one. Written to a
-     * temporary file first so an interrupted write can’t leave a half-written
-     * list that would fail to parse on the next load.
-     */
+    // Write a blocklist body, replacing any previous one. Written to a
+    // temporary file first so an interrupted write can’t leave a half-written
+    // list that would fail to parse on the next load.
     private fun writeCacheFile(id: String, body: String) {
         val file = cacheFile(id)
         file.parentFile?.mkdirs()
@@ -809,10 +793,8 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Move a body cached by an earlier version out of the DataStore and into a
-     * file, returning it. Returns null when there is nothing cached.
-     */
+    // Move a body cached by an earlier version out of the DataStore and into a
+    // file, returning it. Returns null when there is nothing cached.
     private suspend fun migrateCacheFromPreferences(id: String): String? {
         val key = stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)
         val legacy = context.blocklistDataStore.data.first()[key] ?: return null

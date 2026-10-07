@@ -79,7 +79,7 @@ class HomeViewModelTest {
 
     // Helper Methods
 
-    /** Wait for DataStore IO operations to complete on real threads. */
+    // Wait for DataStore IO operations to complete on real threads
     private fun waitForIo() {
         Thread.sleep(500)
     }

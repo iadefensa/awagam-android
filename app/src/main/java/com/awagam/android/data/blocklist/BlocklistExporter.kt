@@ -83,11 +83,9 @@ class BlocklistExporter(private val context: Context) {
         }
     }
 
-    /**
-     * Pi-hole list format with ABP-style entries, which (unlike plain domains or
-     * regexes in lists) Pi-hole applies to subdomains.
-     * URLs are listed as comments only, since Pi-hole can’t match paths.
-     */
+    // Pi-hole list format with ABP-style entries, which (unlike plain domains
+    // or regexes in lists) Pi-hole applies to subdomains. URLs are listed as
+    // comments only, since Pi-hole can’t match paths.
     private fun generatePihole(domains: Set<String>, tlds: Set<String>, urls: Set<String>): String {
         val lines = mutableListOf<String>()
         lines.add("# AWAGAM Blocklist for Pi-hole")
@@ -122,10 +120,8 @@ class BlocklistExporter(private val context: Context) {
         return lines.joinToString("\n")
     }
 
-    /**
-     * AdGuard Home format: ||domain^ syntax.
-     * URLs are listed as comments only, since AdGuard Home can’t match paths.
-     */
+    // AdGuard Home format: ||domain^ syntax.
+    // URLs are listed as comments only, since AdGuard Home can’t match paths.
     private fun generateAdGuard(domains: Set<String>, tlds: Set<String>, urls: Set<String>): String {
         val lines = mutableListOf<String>()
         lines.add("! AWAGAM Blocklist for AdGuard Home")
@@ -161,10 +157,8 @@ class BlocklistExporter(private val context: Context) {
         return lines.joinToString("\n")
     }
 
-    /**
-     * Standard hosts file format: 0.0.0.0 domain
-     * URLs are skipped entirely (hosts files only support domain-level blocking).
-     */
+    // Standard hosts file format: 0.0.0.0 domain.
+    // URLs are skipped entirely (hosts files only support domain-level blocking).
     private fun generateHosts(domains: Set<String>, tlds: Set<String>, urls: Set<String>): String {
         val lines = mutableListOf<String>()
         lines.add("# AWAGAM Blocklist (hosts format)")

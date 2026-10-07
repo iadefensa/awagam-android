@@ -13,28 +13,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// Amber-400 (semantic: warning, matching the AWAGAM extension’s warning
-// status)—Material 3 color schemes have no warning slot (contrast with
-// surface ≈ 8:1)
+/**
+ * Amber-400 (semantic: warning, matching the AWAGAM extension’s warning
+ * status)—Material 3 color schemes have no warning slot (contrast with
+ * surface ≈ 8:1)
+ */
 val Warning = Color(0xFFFBBF24)
 
-// Amber-900, the container step for `[Warning]`, matching how the green and red
-// containers pair with their foreground colors (contrast with light text ≈ 8.5:1)
+/**
+ * Amber-900, the container step for [Warning], matching how the green and red
+ * containers pair with their foreground colors (contrast with light text ≈ 8.5:1)
+ */
 val WarningContainer = Color(0xFF78350F)
 
-// The iadefensa.com accent, and the app’s one bright color. It marks whatever
-// matters most on a screen, following the site, where lime is the primary
-// action: on Home the protection state (status line, card tint, toggle), in
-// settings the button that adds a blocklist.
+/**
+ * The iadefensa.com accent, and the app’s one bright color. It marks whatever
+ * matters most on a screen, following the site, where lime is the primary
+ * action: on Home the protection state (status line, card tint, toggle), in
+ * settings the button that adds a blocklist.
+ */
 val Brand = Color(0xFFCEFF1A)
 
-// Black on lime, as on the site’s primary buttons (≈ 17.9:1)
+/** Black on lime, as on the site’s primary buttons (≈ 17.9:1) */
 val OnBrand = Color(0xFF000000)
 
-// Red-300 (semantic: error), the same idea for red. `error` is red-600, sized so
-// white reads on it as a fill; against the `surfaceVariant` cards that carry the
-// blocklist errors, the delete action, and the block-rate bar it is only ≈ 2.2:1.
-// Red-400 still falls short for text, hence the lighter step (≈ 5.5:1).
+/**
+ * Red-300 (semantic: error), the same idea for red. `error` is red-600, sized so
+ * white reads on it as a fill; against the `surfaceVariant` cards that carry the
+ * blocklist errors, the delete action, and the block-rate bar it is only ≈ 2.2:1.
+ * Red-400 still falls short for text, hence the lighter step (≈ 5.5:1).
+ */
 val ErrorText = Color(0xFFFCA5A5)
 
 // Shadcn-style neutral palette (matching AWAGAM extension design)
@@ -51,9 +59,9 @@ private val DarkColorScheme = darkColorScheme(
     onSecondary = Color.White,               // White text on secondary
     secondaryContainer = Color(0xFF333333), // Tonal buttons (the disable durations)
     onSecondaryContainer = Color(0xFFFBFBFB), // Light text (contrast ≈ 12:1)
-    // Green-700 (contrast with white ≈ 5:1). No longer drawn directly—[Brand]
-    // carries the protection-active signal now—but kept as the accent the
-    // container below pairs with, and for any Material component reaching for it.
+    // Green-700 (contrast with white ≈ 5:1). Not drawn directly—`Brand` carries
+    // the protection-active signal—but kept as the accent the container below
+    // pairs with, and for any Material component reaching for it.
     tertiary = Color(0xFF15803D),
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFF14532D),  // Green-900 card (empty state, battery prompt)

@@ -67,7 +67,7 @@ class BlocklistParserTest {
         val group = groups["test-group"]!!
 
         assertEquals("Test Group", group.name)
-        // Context is now JsonElement - verify it's an array
+        // Context is a JsonElement—verify it’s an array
         assertTrue(group.context is JsonArray)
         val contextArray = group.context as JsonArray
         assertEquals(2, contextArray.size)

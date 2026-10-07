@@ -44,10 +44,12 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         private val BLOCKED_IPV4 = InetAddress.getByName("0.0.0.0")
         private val BLOCKED_IPV6 = InetAddress.getByName("::")
 
-        // Hardcoded IPs for DoH servers to avoid DNS lookup chicken-and-egg problem
-        // When the VPN is active, DNS queries go through us, so we can’t use DNS to resolve DoH servers.
-        // Internal so a test can hold `DnsProviders` to it: A selectable provider
-        // missing from here would fall through to system DNS
+        /**
+         * Hardcoded IPs for DoH servers, avoiding a chicken-and-egg problem: When
+         * the VPN is active, DNS queries go through us, so we can’t use DNS to
+         * resolve DoH servers. Internal so a test can hold `DnsProviders` to it: A
+         * selectable provider missing from here would fall through to system DNS.
+         */
         internal val DOH_SERVER_IPS = mapOf(
             // DNS4EU (EU-based, GDPR-compliant)
             "protective.joindns4.eu" to listOf("86.54.11.1", "86.54.11.201", "2a13:1001::86:54:11:1", "2a13:1001::86:54:11:201"),
@@ -181,7 +183,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
             rst[2] = ((totalLength shr 8) and 0xFF).toByte()
             rst[3] = (totalLength and 0xFF).toByte()
 
-            // Don't Fragment flag, clear identification
+            // Don’t Fragment flag, clear identification
             rst[4] = 0; rst[5] = 0
             rst[6] = 0x40.toByte(); rst[7] = 0
 
@@ -274,11 +276,9 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return builder.build()
     }
 
-    /**
-     * Creates a DNS resolver that uses hardcoded IPs for known DoH servers.
-     * This avoids the chicken-and-egg problem where resolving the DoH server
-     * hostname would require DNS, which goes through the VPN, which needs DoH…
-     */
+    // Creates a DNS resolver that uses hardcoded IPs for known DoH servers.
+    // This avoids the chicken-and-egg problem where resolving the DoH server
+    // hostname would require DNS, which goes through the VPN, which needs DoH…
     private fun createBypassDns(): Dns {
         return object : Dns {
             override fun lookup(hostname: String): List<InetAddress> {
@@ -388,10 +388,8 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         object Stale : ProbeResult
     }
 
-    /**
-     * The upstream together with the generation it belongs to, read under the
-     * switch lock so the pair can’t straddle a switch.
-     */
+    // The upstream together with the generation it belongs to, read under the
+    // switch lock so the pair can’t straddle a switch
     @Synchronized
     private fun currentUpstream(): Pair<String, Int> = upstreamDnsUrl to resolverGeneration
 
@@ -574,7 +572,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         // The transaction ID is what the client matches on, so make sure it is
         // the one it sent even if the upstream echoed something else. Patching a
         // copy keeps the cached entry as it was received, since cache hits set
-        // the ID of whichever query they answer
+        // the ID of whichever query they answer.
         val queryId = query.header.id
         if (responseMessage.header.id == queryId) {
             return response
@@ -585,11 +583,9 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return patched
     }
 
-    /**
-     * Cache the response unless the upstream was switched while it was in flight.
-     * Synchronized on the same lock as `switchUpstreamDns`, so the check and the
-     * write can’t straddle that switch’s cache clear.
-     */
+    // Cache the response unless the upstream was switched while it was in flight.
+    // Synchronized on the same lock as `switchUpstreamDns`, so the check and the
+    // write can’t straddle that switch’s cache clear.
     @Synchronized
     private fun cacheIfCurrent(
         generation: Int,

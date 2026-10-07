@@ -30,8 +30,10 @@ object BlocklistValidator {
     private const val MAX_DNS_LABEL_LENGTH = 63
     private const val MAX_DOMAIN_LENGTH = 253
 
-    // Number of skipped entries named in a warning—a broken blocklist may have
-    // hundreds of thousands, so only these are kept while all are counted
+    /**
+     * Number of skipped entries named in a warning—a broken blocklist may have
+     * hundreds of thousands, so only these are kept while all are counted
+     */
     internal const val MAX_LISTED_SKIP_DETAILS = 10
 
     /**
@@ -427,9 +429,7 @@ object BlocklistValidator {
         return ValidationResult(valid = true, metadata = countRules(groups))
     }
 
-    /**
-     * The error for an invalid TLD, domain, or URL entry, or null if it’s valid.
-     */
+    // The error for an invalid TLD, domain, or URL entry, or null if it’s valid
     private fun entryError(field: String, entry: String, groupId: String): String? = when {
         field == "tlds" && !isValidTld(entry) -> "Invalid TLD in group \"$groupId\": $entry"
         field == "domains" && !isValidDomain(entry) -> "Invalid domain in group \"$groupId\": $entry"
@@ -499,7 +499,7 @@ object BlocklistValidator {
         if (domain.length > MAX_DOMAIN_LENGTH) return false
         if (domain.contains("..")) return false
 
-        // Check for partial IP patterns (e.g., "142.91.159." for blocking IP ranges)
+        // Check for partial IP patterns (e.g., “142.91.159.” for blocking IP ranges)
         val partialIpPattern = Regex("""^(\d{1,3}\.){1,3}\d{0,3}\.?$""")
         if (partialIpPattern.matches(domain)) {
             val octets = domain.trimEnd('.').split(".")
@@ -535,7 +535,7 @@ object BlocklistValidator {
                 URL(url)
                 true
             } else {
-                // Protocol-less URL (e.g., "example.com/path")
+                // Protocol-less URL (e.g., “example.com/path”)
                 val firstSlash = url.indexOf('/')
                 val hostname = if (firstSlash == -1) url else url.substring(0, firstSlash)
 
@@ -562,10 +562,8 @@ object BlocklistValidator {
         )
     }
 
-    /**
-     * Sanitize a string by removing angle brackets (so it can’t carry HTML tags)
-     * and limiting length, with an ellipsis when truncated.
-     */
+    // Sanitize a string by removing angle brackets (so it can’t carry HTML tags)
+    // and limiting length, with an ellipsis when truncated
     private fun sanitizeString(input: String, maxLength: Int): String {
         val stripped = input.replace(Regex("[<>]"), "")
         return if (stripped.length > maxLength) stripped.take(maxLength - 1) + "…" else stripped

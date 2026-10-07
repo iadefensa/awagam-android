@@ -444,9 +444,7 @@ class DnsPacketTest {
         assertEquals(40, ipTotalLength)
     }
 
-    /**
-     * Build a minimal IPv4+UDP DNS query packet for testing.
-     */
+    // Build a minimal IPv4+UDP DNS query packet for testing
     private fun buildDnsQueryPacket(
         srcIp: ByteArray,
         dstIp: ByteArray,
@@ -497,9 +495,7 @@ class DnsPacketTest {
         return packet
     }
 
-    /**
-     * Build a minimal IPv4+TCP SYN packet for testing.
-     */
+    // Build a minimal IPv4+TCP SYN packet for testing
     private fun buildTcpSynPacket(
         srcIp: ByteArray,
         dstIp: ByteArray,

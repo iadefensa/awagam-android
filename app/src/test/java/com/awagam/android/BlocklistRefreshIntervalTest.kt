@@ -41,7 +41,7 @@ class BlocklistRefreshIntervalTest {
 
     // Helper Methods
 
-    /** Timestamp in the format blocklist configs store, [millisAgo] in the past. */
+    // Timestamp in the format blocklist configs store, `millisAgo` in the past
     private fun timestamp(millisAgo: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

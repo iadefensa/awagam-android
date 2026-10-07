@@ -67,8 +67,10 @@ data class ExternalBlocklistConfig(
     val enabled: Boolean = true,
     val lastUpdated: String? = null,
     val lastAttempted: String? = null,
-    // An imported value is kept for export fidelity but not obeyed here; this
-    // app refreshes every list on `BLOCKLIST_REFRESH_INTERVAL_MS`
+    /**
+     * An imported value is kept for export fidelity but not obeyed here; this
+     * app refreshes every list on `BLOCKLIST_REFRESH_INTERVAL_MS`
+     */
     val updateInterval: Long = BLOCKLIST_REFRESH_INTERVAL_MS,
     val status: String = "pending",
     val errorMessage: String? = null,

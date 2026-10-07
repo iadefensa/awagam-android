@@ -115,13 +115,11 @@ class BlocklistUpdateWorker(
         }
     }
 
-    /**
-     * Which enabled lists there are, and when each last refreshed successfully.
-     * `lastUpdated` moves only on a refetch that succeeded, so comparing this
-     * across the refresh tells whether any rules actually changed. Rebuilding
-     * the matcher holds the old and the new rule set in memory at once, which is
-     * not worth doing every six hours for lists that mostly did not move.
-     */
+    // Which enabled lists there are, and when each last refreshed successfully.
+    // `lastUpdated` moves only on a refetch that succeeded, so comparing this
+    // across the refresh tells whether any rules actually changed. Rebuilding
+    // the matcher holds the old and the new rule set in memory at once, which is
+    // not worth doing every six hours for lists that mostly did not move.
     private fun refreshState(configs: List<ExternalBlocklistConfig>): Set<Pair<String, String?>> =
         configs.filter { it.enabled }.map { it.id to it.lastUpdated }.toSet()
 
