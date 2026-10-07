@@ -62,18 +62,18 @@ class BlocklistRefreshIntervalTest {
     // Interval Tests
 
     @Test
-    fun `a list that was never refreshed is due`() {
+    fun `A list that was never refreshed is due`() {
         assertTrue(manager.needsUpdate(config(lastUpdated = null)))
     }
 
     @Test
-    fun `a list refreshed longer ago than the interval is due`() {
+    fun `A list refreshed longer ago than the interval is due`() {
         val ago = BLOCKLIST_REFRESH_INTERVAL_MS + TimeUnit.HOURS.toMillis(1)
         assertTrue(manager.needsUpdate(config(timestamp(ago))))
     }
 
     @Test
-    fun `a list refreshed within the interval is not due`() {
+    fun `A list refreshed within the interval is not due`() {
         assertTrue(
             "Test assumes an interval longer than an hour",
             BLOCKLIST_REFRESH_INTERVAL_MS > TimeUnit.HOURS.toMillis(1)
@@ -82,7 +82,7 @@ class BlocklistRefreshIntervalTest {
     }
 
     @Test
-    fun `an imported short interval does not make a list due early`() {
+    fun `An imported short interval does not make a list due early`() {
         val config = config(
             lastUpdated = timestamp(TimeUnit.HOURS.toMillis(1)),
             updateInterval = TimeUnit.MINUTES.toMillis(1)
@@ -91,7 +91,7 @@ class BlocklistRefreshIntervalTest {
     }
 
     @Test
-    fun `an imported long interval does not keep a list from being due`() {
+    fun `An imported long interval does not keep a list from being due`() {
         val ago = BLOCKLIST_REFRESH_INTERVAL_MS + TimeUnit.HOURS.toMillis(1)
         val config = config(
             lastUpdated = timestamp(ago),
@@ -101,7 +101,7 @@ class BlocklistRefreshIntervalTest {
     }
 
     @Test
-    fun `an unparseable timestamp makes a list due`() {
+    fun `An unparseable timestamp makes a list due`() {
         assertTrue(manager.needsUpdate(config(lastUpdated = "not a timestamp")))
     }
 }

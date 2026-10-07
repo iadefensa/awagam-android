@@ -49,7 +49,7 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `positive answers use the smallest answer TTL`() {
+    fun `Positive answers use the smallest answer TTL`() {
         val message = response(Rcode.NOERROR) {
             it.addRecord(ARecord(name, DClass.IN, 900L, InetAddress.getByName("93.184.216.34")), Section.ANSWER)
             it.addRecord(ARecord(name, DClass.IN, 300L, InetAddress.getByName("93.184.216.35")), Section.ANSWER)
@@ -59,7 +59,7 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `positive answers are clamped to the minimum`() {
+    fun `Clamps positive answers to the minimum`() {
         val message = response(Rcode.NOERROR) {
             it.addRecord(ARecord(name, DClass.IN, 5L, InetAddress.getByName("93.184.216.34")), Section.ANSWER)
         }
@@ -68,7 +68,7 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `negative answers honor the SOA negative TTL`() {
+    fun `Negative answers honor the SOA negative TTL`() {
         val soa = SOARecord(
             name, DClass.IN, 3600L,
             Name.fromString("ns.example.com."), Name.fromString("hostmaster.example.com."),
@@ -81,7 +81,7 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `negative answers are capped so new domains resolve soon`() {
+    fun `Caps negative answers so new domains resolve soon`() {
         val soa = SOARecord(
             name, DClass.IN, 86400L,
             Name.fromString("ns.example.com."), Name.fromString("hostmaster.example.com."),
@@ -93,14 +93,14 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `negative answers without an SOA fall back to the minimum`() {
+    fun `Negative answers without an SOA fall back to the minimum`() {
         val message = response(Rcode.NXDOMAIN) { }
 
         assertEquals(60L, DnsCache().getEffectiveTtl(message))
     }
 
     @Test
-    fun `cached responses are returned verbatim`() {
+    fun `Returns cached responses verbatim`() {
         val cache = DnsCache()
         val message = response(Rcode.NOERROR) {
             it.addRecord(ARecord(name, DClass.IN, 300L, InetAddress.getByName("93.184.216.34")), Section.ANSWER)
@@ -113,7 +113,7 @@ class DnsCacheTest {
     }
 
     @Test
-    fun `queries for other names miss`() {
+    fun `Queries for other names miss`() {
         val cache = DnsCache()
         val message = response(Rcode.NOERROR) {
             it.addRecord(ARecord(name, DClass.IN, 300L, InetAddress.getByName("93.184.216.34")), Section.ANSWER)
