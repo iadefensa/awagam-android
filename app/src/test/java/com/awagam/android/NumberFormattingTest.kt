@@ -26,13 +26,13 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `values below one thousand stay exact`() {
+    fun `Values below one thousand stay exact`() {
         assertEquals("0", formatCompact(0))
         assertEquals("999", formatCompact(999))
     }
 
     @Test
-    fun `thousands and millions abbreviate without a trailing zero`() {
+    fun `Thousands and millions abbreviate without a trailing zero`() {
         assertEquals("1K", formatCompact(1_000))
         assertEquals("1.2K", formatCompact(1_200))
         assertEquals("2K", formatCompact(2_000))
@@ -42,7 +42,7 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `the decimal is dropped from ten up`() {
+    fun `Drops the decimal from ten up`() {
         assertEquals("9.9K", formatCompact(9_900))
         assertEquals("10K", formatCompact(9_960))
         assertEquals("13K", formatCompact(12_500))
@@ -52,14 +52,14 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `rounding that reaches the next unit carries into it`() {
+    fun `Rounding that reaches the next unit carries into it`() {
         assertEquals("1M", formatCompact(999_900))
         assertEquals("1M", formatCompact(999_500))
         assertEquals("1B", formatCompact(999_900_000))
     }
 
     @Test
-    fun `billions and trillions abbreviate too`() {
+    fun `Billions and trillions abbreviate too`() {
         assertEquals("1B", formatCompact(1_000_000_000))
         assertEquals("2.5B", formatCompact(2_500_000_000))
         assertEquals("40B", formatCompact(40_000_000_000))
@@ -68,7 +68,7 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `rounding at the largest unit does not widen the amount`() {
+    fun `Rounding at the largest unit does not widen the amount`() {
         // The last unit has no next one to carry into, so it has to reach the
         // one below with room to spare: 999.5T would otherwise print “1000T”
         assertEquals("1P", formatCompact(999_500_000_000_000))
@@ -77,7 +77,7 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `negative values come back exact`() {
+    fun `Negative values come back exact`() {
         // No count here can go negative, so this pins the fallback rather than
         // a guarantee: Exact and possibly wide, never a throw and never the
         // overflow that negating `Long.MIN_VALUE` would be
@@ -87,7 +87,7 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `no value the cards can show exceeds four characters`() {
+    fun `No value the cards can show exceeds four characters`() {
         // Sampled across the whole range rather than at the boundaries alone:
         // the cap is a property of the output, not of a handful of cases.
         // Stops where the multiplication would overflow; the cases above cover
@@ -107,14 +107,14 @@ class NumberFormattingTest {
     }
 
     @Test
-    fun `a comma-decimal locale still formats with a dot`() {
+    fun `A comma-decimal locale still formats with a dot`() {
         Locale.setDefault(Locale.GERMANY)
         assertEquals("1.2K", formatCompact(1_200))
         assertEquals("1.4M", formatCompact(1_400_000))
     }
 
     @Test
-    fun `a comma-decimal locale still drops the trailing zero`() {
+    fun `A comma-decimal locale still drops the trailing zero`() {
         Locale.setDefault(Locale.GERMANY)
         assertEquals("2K", formatCompact(2_000))
         assertEquals("1M", formatCompact(1_000_000))

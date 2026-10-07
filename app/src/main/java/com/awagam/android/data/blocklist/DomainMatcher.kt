@@ -3,7 +3,7 @@
 
 package com.awagam.android.data.blocklist
 
-import java.net.IDN
+import android.icu.text.IDNA
 
 /**
  * Immutable set of blocking rules, matched against query hostnames.
@@ -14,9 +14,9 @@ import java.net.IDN
  * per-query cost constant as users add large external blocklists.
  */
 class DomainMatcher(
-    /** Normalized, with a leading dot (".example") */
+    /** Normalized, with a leading dot (“.example”) */
     val tlds: Set<String>,
-    /** Normalized to punycode, without a "www." prefix */
+    /** Normalized to punycode, without a “www.” prefix */
     val domains: Set<String>
 ) {
 
@@ -27,13 +27,13 @@ class DomainMatcher(
         val normalized = normalizeDomain(hostname)
         if (normalized.isEmpty()) return false
 
-        // Walk the hostname and each of its parent domains: "a.b.example.com"
-        // checks "a.b.example.com", "b.example.com", "example.com", "com"
+        // Walk the hostname and each of its parent domains: “a.b.example.com”
+        // checks “a.b.example.com”, “b.example.com”, “example.com”, “com”
         var index = 0
         while (index in 0 until normalized.length) {
             val candidate = normalized.substring(index)
             if (domains.contains(candidate)) return true
-            // A TLD rule matches at any label boundary, so ".com" blocks "example.com"
+            // A TLD rule matches at any label boundary, so “.com” blocks “example.com”
             if (index > 0 && tlds.contains(".$candidate")) return true
 
             val nextDot = normalized.indexOf('.', index)
@@ -47,13 +47,30 @@ class DomainMatcher(
         fun normalizeTld(tld: String): String =
             ".${normalizeDomain(tld.trim().removePrefix("."))}"
 
+        // UTS #46 as browsers apply it: nontransitional (keeps “ß” instead of mapping
+        // it to “ss”), with BiDi and ContextJ checks
+        private val idna: IDNA = IDNA.getUTS46Instance(
+            IDNA.NONTRANSITIONAL_TO_ASCII or IDNA.CHECK_BIDI or IDNA.CHECK_CONTEXTJ
+        )
+
+        // Browsers skip hyphen checks (CheckHyphens=false), and CDN hosts like “r3---sn-abc.googlevideo.com” rely on that
+        private val ignoredIdnaErrors = setOf(
+            IDNA.Error.HYPHEN_3_4,
+            IDNA.Error.LEADING_HYPHEN,
+            IDNA.Error.TRAILING_HYPHEN
+        )
+
+        /** Converts a domain to its ASCII (punycode) form, or returns null if it isn’t a valid IDN */
+        fun toAscii(domain: String): String? {
+            val info = IDNA.Info()
+            val ascii = StringBuilder()
+            idna.nameToASCII(domain, ascii, info)
+            return if ((info.errors - ignoredIdnaErrors).isEmpty()) ascii.toString() else null
+        }
+
         fun normalizeDomain(domain: String): String {
             val trimmed = domain.lowercase().trim().trimEnd('.')
-            return try {
-                IDN.toASCII(trimmed)
-            } catch (e: Exception) {
-                trimmed
-            }
+            return toAscii(trimmed) ?: trimmed
         }
 
         val EMPTY = DomainMatcher(emptySet(), emptySet())

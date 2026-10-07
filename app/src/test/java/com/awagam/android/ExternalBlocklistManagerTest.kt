@@ -3,14 +3,20 @@
 
 package com.awagam.android
 
+import android.app.Application
 import com.awagam.android.data.blocklist.BlocklistGroup
+import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -18,32 +24,34 @@ import java.util.concurrent.atomic.AtomicInteger
  * Verifies that hosting-platform blob URLs are correctly converted to direct
  * download URLs, and that bundle imports are merged with collision-safe group IDs.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class ExternalBlocklistManagerTest {
 
     // GitHub
 
     @Test
-    fun `GitHub blob URL is converted to raw`() {
+    fun `Converts a GitHub blob URL to raw`() {
         val input = "https://github.com/user/repo/blob/main/blocklist.json"
         val expected = "https://raw.githubusercontent.com/user/repo/main/blocklist.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `GitHub blob URL on non-main branch is converted to raw`() {
+    fun `Converts a GitHub blob URL on a non-main branch to raw`() {
         val input = "https://github.com/user/repo/blob/develop/path/to/file.json"
         val expected = "https://raw.githubusercontent.com/user/repo/develop/path/to/file.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `already-raw GitHub URL is unchanged`() {
+    fun `Keeps an already-raw GitHub URL unchanged`() {
         val url = "https://raw.githubusercontent.com/user/repo/main/blocklist.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
 
     @Test
-    fun `GitHub tree URL is rejected as a directory`() {
+    fun `Rejects a GitHub tree URL as a directory`() {
         try {
             ExternalBlocklistManager.convertToRawUrl("https://github.com/user/repo/tree/main/lists")
             fail("Expected directory URL to be rejected")
@@ -53,21 +61,21 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `GitHub file URL with a tree segment in its file path is converted, not rejected`() {
+    fun `Converts a GitHub file URL with a tree segment in its file path instead of rejecting it`() {
         val input = "https://github.com/user/repo/blob/main/tree/list.json"
         val expected = "https://raw.githubusercontent.com/user/repo/main/tree/list.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `GitHub URL with tree outside the kind segment is unchanged`() {
+    fun `Keeps a GitHub URL with tree outside the kind segment unchanged`() {
         // A release asset whose tag is named “tree” is neither a file page nor a directory
         val url = "https://github.com/user/repo/releases/download/tree/list.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
 
     @Test
-    fun `GitHub file URL with a second blob segment in its file path keeps that segment`() {
+    fun `Keeps a second blob segment in the file path of a GitHub file URL`() {
         val input = "https://github.com/user/repo/blob/main/blob/list.json"
         val expected = "https://raw.githubusercontent.com/user/repo/main/blob/list.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
@@ -76,21 +84,21 @@ class ExternalBlocklistManagerTest {
     // GitLab
 
     @Test
-    fun `GitLab blob URL is converted to raw`() {
+    fun `Converts a GitLab blob URL to raw`() {
         val input = "https://gitlab.com/user/repo/-/blob/main/blocklist.json"
         val expected = "https://gitlab.com/user/repo/-/raw/main/blocklist.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `GitLab blob URL on non-main branch is converted to raw`() {
+    fun `Converts a GitLab blob URL on a non-main branch to raw`() {
         val input = "https://gitlab.com/group/subgroup/repo/-/blob/stable/path/file.json"
         val expected = "https://gitlab.com/group/subgroup/repo/-/raw/stable/path/file.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `already-raw GitLab URL is unchanged`() {
+    fun `Keeps an already-raw GitLab URL unchanged`() {
         val url = "https://gitlab.com/user/repo/-/raw/main/blocklist.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
@@ -98,21 +106,21 @@ class ExternalBlocklistManagerTest {
     // Codeberg
 
     @Test
-    fun `Codeberg blob URL is converted to raw`() {
+    fun `Converts a Codeberg blob URL to raw`() {
         val input = "https://codeberg.org/user/repo/src/branch/main/blocklist.json"
         val expected = "https://codeberg.org/user/repo/raw/branch/main/blocklist.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `Codeberg blob URL on non-main branch is converted to raw`() {
+    fun `Converts a Codeberg blob URL on a non-main branch to raw`() {
         val input = "https://codeberg.org/user/repo/src/branch/feature/path/file.json"
         val expected = "https://codeberg.org/user/repo/raw/branch/feature/path/file.json"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `already-raw Codeberg URL is unchanged`() {
+    fun `Keeps an already-raw Codeberg URL unchanged`() {
         val url = "https://codeberg.org/user/repo/raw/branch/main/blocklist.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
@@ -120,14 +128,14 @@ class ExternalBlocklistManagerTest {
     // Pastebin
 
     @Test
-    fun `Pastebin URL is converted to raw`() {
+    fun `Converts a Pastebin URL to raw`() {
         val input = "https://pastebin.com/abcXYZ123"
         val expected = "https://pastebin.com/raw/abcXYZ123"
         assertEquals(expected, ExternalBlocklistManager.convertToRawUrl(input))
     }
 
     @Test
-    fun `already-raw Pastebin URL is unchanged`() {
+    fun `Keeps an already-raw Pastebin URL unchanged`() {
         val url = "https://pastebin.com/raw/abcXYZ123"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
@@ -135,13 +143,13 @@ class ExternalBlocklistManagerTest {
     // Non-Platform URLs
 
     @Test
-    fun `arbitrary HTTPS URL is unchanged`() {
+    fun `Keeps an arbitrary HTTPS URL unchanged`() {
         val url = "https://example.com/blocklist.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
 
     @Test
-    fun `URL with no matching pattern is unchanged`() {
+    fun `Keeps a URL with no matching pattern unchanged`() {
         val url = "https://cdn.example.org/lists/domains.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
@@ -149,13 +157,13 @@ class ExternalBlocklistManagerTest {
     // Host-Exact Matching (Not Substring)
 
     @Test
-    fun `URL whose path contains github-com substring is unchanged`() {
+    fun `Keeps a URL whose path contains a github-com substring unchanged`() {
         val url = "https://example.com/mirror/github.com/blob/main/file.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
 
     @Test
-    fun `URL whose path contains gitlab-com substring is unchanged`() {
+    fun `Keeps a URL whose path contains a gitlab-com substring unchanged`() {
         val url = "https://example.com/mirror/gitlab.com/-/blob/main/file.json"
         assertEquals(url, ExternalBlocklistManager.convertToRawUrl(url))
     }
@@ -165,7 +173,7 @@ class ExternalBlocklistManagerTest {
     private fun group(name: String) = BlocklistGroup(name = name, domains = listOf("example.com"))
 
     @Test
-    fun `merged group IDs are prefixed per import`() {
+    fun `Prefixes merged group IDs per import`() {
         val merged = linkedMapOf<String, BlocklistGroup>()
         ExternalBlocklistManager.mergeImportedGroups(merged, mapOf("ads" to group("Ads"), "trackers" to group("Trackers")), 0)
         ExternalBlocklistManager.mergeImportedGroups(merged, mapOf("ads" to group("Other Ads")), 1)
@@ -174,7 +182,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `group ID collisions get a numeric suffix`() {
+    fun `Group ID collisions get a numeric suffix`() {
         // The numeric prefixes can’t collide across imports, so exercise the defensive branch directly
         val merged = linkedMapOf("import1_ads" to group("Existing"), "import1_ads_2" to group("Existing 2"))
         ExternalBlocklistManager.mergeImportedGroups(merged, mapOf("ads" to group("Ads")), 0)
@@ -183,7 +191,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `merging fails fast once the group limit is exceeded`() {
+    fun `Fails fast once the group limit is exceeded`() {
         val merged = linkedMapOf<String, BlocklistGroup>()
         ExternalBlocklistManager.mergeImportedGroups(merged, (1..60).associate { "g$it" to group("G$it") }, 0)
         try {
@@ -195,11 +203,46 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `merging exactly 100 groups is allowed`() {
+    fun `Allows merging exactly 100 groups`() {
         val merged = linkedMapOf<String, BlocklistGroup>()
         ExternalBlocklistManager.mergeImportedGroups(merged, (1..50).associate { "g$it" to group("G$it") }, 0)
         ExternalBlocklistManager.mergeImportedGroups(merged, (1..50).associate { "g$it" to group("G$it") }, 1)
         assertEquals(100, merged.size)
+    }
+
+    // Skip Warnings
+
+    @Test
+    fun `Skip warnings summarize before listing details`() {
+        assertEquals(null, ExternalBlocklistManager.skipWarning(0, 0, emptyList()))
+        assertEquals(
+            "1 invalid entry skipped: Invalid TLD in group \"g\": x",
+            ExternalBlocklistManager.skipWarning(1, 0, listOf("Invalid TLD in group \"g\": x"))
+        )
+        assertEquals(
+            "2 invalid groups skipped: a; b",
+            ExternalBlocklistManager.skipWarning(0, 2, listOf("a", "b"))
+        )
+        assertEquals(
+            "1 of 2 imports skipped, 3 invalid entries and 1 invalid group skipped: dead; a; b; c; d",
+            ExternalBlocklistManager.skipWarning(3, 1, listOf("a", "b", "c", "d"), importFailures = listOf("dead"), imports = 2)
+        )
+    }
+
+    @Test
+    fun `Skip warnings list only the first 10 details`() {
+        val details = (0 until 12).map { "entry$it" }
+        val warning = ExternalBlocklistManager.skipWarning(12, 0, details)!!
+        assertTrue(warning, warning.startsWith("12 invalid entries skipped: entry0; "))
+        assertTrue(warning, warning.endsWith("entry9; …"))
+        assertFalse(warning, warning.contains("entry10"))
+    }
+
+    @Test
+    fun `Skip warnings mark omitted details based on counts, not listed details`() {
+        val details = (0 until 10).map { "entry$it" }
+        assertTrue(ExternalBlocklistManager.skipWarning(25, 0, details)!!.endsWith("entry9; …"))
+        assertTrue(ExternalBlocklistManager.skipWarning(10, 0, details)!!.endsWith("entry9"))
     }
 
     // Bundle Resolution
@@ -211,7 +254,7 @@ class ExternalBlocklistManagerTest {
     private val memberJson = """{"ads": {"name": "Ads", "domains": ["ads.example.com"]}}"""
 
     @Test
-    fun `failed attempts back off exponentially before retrying`() = runTest {
+    fun `Failed attempts back off exponentially before retrying`() = runTest {
         val bundle = bundleOf("https://a.example/flaky.json")
         var calls = 0
         val start = System.currentTimeMillis()
@@ -229,7 +272,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `failing imports are skipped with a warning`() = runTest {
+    fun `Skips failing imports with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/dead.json", "https://a.example/ok2.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { url ->
             if (url.contains("dead")) throw Exception("HTTP 404") else memberJson
@@ -242,7 +285,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `invalid import URLs are skipped with a warning`() = runTest {
+    fun `Skips invalid import URLs with a warning`() = runTest {
         val bundle = bundleOf("@@https://a.example/broken.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(2, resolved.metadata.imports)
@@ -251,7 +294,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `duplicate imports are skipped with a warning`() = runTest {
+    fun `Skips duplicate imports with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(1, resolved.metadata.importsLoaded)
@@ -260,7 +303,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `oversized imports are skipped before parsing`() = runTest {
+    fun `Skips oversized imports before parsing`() = runTest {
         val huge = "x".repeat(10 * 1024 * 1024 + 1)
         val bundle = bundleOf("https://a.example/huge.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
@@ -271,7 +314,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `imports are fetched via their normalized URL`() = runTest {
+    fun `Fetches imports via their normalized URL`() = runTest {
         val bundle = bundleOf("https://github.com/user/repo/blob/main/list.json")
         var fetchedUrl: String? = null
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
@@ -283,7 +326,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `skipped imports do not count toward the combined size limit`() = runTest {
+    fun `Skipped imports do not count toward the combined size limit`() = runTest {
         // An invalid member almost as large as the limit—if its size counted, the valid import would push the bundle over
         val bigInvalid = "x".repeat(10 * 1024 * 1024 - 50)
         val bundle = bundleOf("https://a.example/big-bad.json", "https://a.example/ok.json")
@@ -295,7 +338,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `resolution fails when no import can be loaded`() = runTest {
+    fun `Resolution fails when no import can be loaded`() = runTest {
         val bundle = bundleOf("https://a.example/d1.json", "https://a.example/d2.json")
         try {
             ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { throw Exception("HTTP 404") }
@@ -306,7 +349,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `nested bundles are skipped with a warning`() = runTest {
+    fun `Skips nested bundles with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/nested.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
             if (url.contains("nested")) """{"imports": ["https://x.example/y.json"]}""" else memberJson
@@ -316,7 +359,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `invalid member JSON is skipped with a warning`() = runTest {
+    fun `Skips invalid member JSON with a warning`() = runTest {
         val bundle = bundleOf("https://a.example/bad.json", "https://a.example/ok.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { url ->
             if (url.contains("bad")) "{invalid" else memberJson
@@ -326,7 +369,47 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `healthy bundles resolve without warning`() = runTest {
+    fun `Keeps imports with invalid entries, counting only their valid entries`() = runTest {
+        val bundle = bundleOf("https://a.example/mixed.json", "https://a.example/ok.json", "https://a.example/dead.json")
+        val mixedJson = """{"ads": {"name": "Ads", "domains": ["ads.example.net", "-invalid.com", 42]}, "nameless": {"domains": ["nameless.com"]}}"""
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) { url ->
+            when {
+                url.contains("mixed") -> mixedJson
+                url.contains("dead") -> throw Exception("HTTP 404")
+                else -> memberJson
+            }
+        }
+        assertEquals(listOf("import1_ads", "import2_ads"), resolved.groups.keys.toList())
+        assertEquals(listOf("ads.example.net"), resolved.groups["import1_ads"]!!.domains)
+        assertEquals(2, resolved.metadata.totalRules)
+        assertEquals(2, resolved.metadata.domains)
+        assertEquals(2, resolved.metadata.groups)
+        assertEquals(2, resolved.metadata.importsLoaded)
+        assertTrue(
+            resolved.warning!!,
+            resolved.warning!!.startsWith(
+                "1 of 3 imports skipped, 2 invalid entries and 1 invalid group skipped: " +
+                    "https://a.example/dead.json (HTTP 404); " +
+                    "https://a.example/mixed.json: Invalid domain in group \"ads\": -invalid.com; "
+            )
+        )
+    }
+
+    @Test
+    fun `Caps bundle skip details across imports while counts stay exact`() = runTest {
+        val bundle = bundleOf("https://a.example/one.json", "https://a.example/two.json")
+        val invalidDomains = (0 until 8).joinToString(",") { "\"-bad$it.com\"" }
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100, retryBackoffUnit = 1) {
+            """{"ads": {"name": "Ads", "domains": ["ads.example.net", $invalidDomains]}}"""
+        }
+        val warning = resolved.warning!!
+        assertTrue(warning, warning.startsWith("16 invalid entries skipped: "))
+        assertEquals(warning, BlocklistValidator.MAX_LISTED_SKIP_DETAILS, Regex("Invalid domain").findAll(warning).count())
+        assertTrue(warning, warning.endsWith("; …"))
+    }
+
+    @Test
+    fun `Healthy bundles resolve without warning`() = runTest {
         val bundle = bundleOf("https://a.example/ok1.json", "https://a.example/ok2.json")
         val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
         assertEquals(null, resolved.warning)
@@ -335,7 +418,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `resolution fails when the combined size limit is exceeded`() = runTest {
+    fun `Resolution fails when the combined size limit is exceeded`() = runTest {
         val bundle = bundleOf("https://a.example/ok.json")
         try {
             ExternalBlocklistManager.resolveBundle(bundle, 10 * 1024 * 1024 - 10) { memberJson }
@@ -346,7 +429,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `imports are fetched concurrently, not one at a time`() = runTest {
+    fun `Fetches imports concurrently, not one at a time`() = runTest {
         val bundle = bundleOf(
             "https://a.example/c1.json", "https://a.example/c2.json", "https://a.example/c3.json",
             "https://a.example/c4.json", "https://a.example/c5.json"
@@ -367,7 +450,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `a hanging import is interrupted at the fetch timeout, not left to run`() = runTest {
+    fun `Interrupts a hanging import at the fetch timeout instead of leaving it to run`() = runTest {
         val bundle = bundleOf("https://a.example/hang.json", "https://a.example/ok.json")
         val start = System.currentTimeMillis()
         val resolved = ExternalBlocklistManager.resolveBundle(
@@ -388,7 +471,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `a slow fetch and a never-attempted import report distinct reasons`() = runTest {
+    fun `A slow fetch and a never-attempted import report distinct reasons`() = runTest {
         // “concurrency = 1” forces sequential batches: ok.json succeeds fast, slow.json
         // is slow enough to hit its own fetch timeout, and that alone exceeds the
         // overall deadline, so never.json is never attempted at all—these are two
@@ -408,7 +491,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `imports past the deadline are skipped as time budget exceeded`() = runTest {
+    fun `Skips imports past the deadline as time budget exceeded`() = runTest {
         val bundle = bundleOf("https://a.example/slow1.json", "https://a.example/slow2.json")
         // “concurrency = 1” forces two sequential batches; the first eats the whole
         // budget, so the deadline check before the second batch should skip it
@@ -421,7 +504,7 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
-    fun `bundle size is counted in UTF-8 bytes`() = runTest {
+    fun `Counts bundle size in UTF-8 bytes`() = runTest {
         // “Ä” is one UTF-16 unit but two UTF-8 bytes—a character-based count would pass this bundle
         val member = """{"ads": {"name": "Äds", "domains": ["ads.example.com"]}}"""
         val bundle = bundleOf("https://a.example/ok.json")

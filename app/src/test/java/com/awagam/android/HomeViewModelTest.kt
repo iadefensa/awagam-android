@@ -79,7 +79,7 @@ class HomeViewModelTest {
 
     // Helper Methods
 
-    /** Wait for DataStore IO operations to complete on real threads. */
+    // Wait for DataStore IO operations to complete on real threads
     private fun waitForIo() {
         Thread.sleep(500)
     }
@@ -87,7 +87,7 @@ class HomeViewModelTest {
     // Initial State Tests
 
     @Test
-    fun `initial UI state has correct defaults`() {
+    fun `Initial UI state has correct defaults`() {
         val state = viewModel.uiState.value
         assertFalse("VPN should be disabled by default", state.isEnabled)
         assertFalse("Should not be temporarily disabled", state.isTemporarilyDisabled)
@@ -187,7 +187,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `a failed start clears the pending state`() {
+    fun `A failed start clears the pending state`() {
         viewModel.startRequested()
         waitForIo()
 
@@ -198,7 +198,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `a DoH error leaves the pending state alone`() {
+    fun `A DoH error leaves the pending state alone`() {
         viewModel.startRequested()
         waitForIo()
 

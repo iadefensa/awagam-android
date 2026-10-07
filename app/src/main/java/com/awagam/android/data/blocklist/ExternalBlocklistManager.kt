@@ -56,7 +56,7 @@ class ExternalBlocklistManager(private val context: Context) {
         private const val MAX_BLOCKLIST_SIZE = 10 * 1024 * 1024 // 10 MB
 
         // Bundle imports are fetched concurrently in batches within an overall
-        // deadline, so a bundle with many slow or dead imports can't stall the
+        // deadline, so a bundle with many slow or dead imports can’t stall the
         // periodic worker past its execution window
         private const val BUNDLE_FETCH_CONCURRENCY = 5
         private val BUNDLE_FETCH_TIME_BUDGET_MS = TimeUnit.MINUTES.toMillis(5)
@@ -157,8 +157,37 @@ class ExternalBlocklistManager(private val context: Context) {
         }
 
         /**
+         * Build the warning for a refresh that skipped bundle imports, invalid
+         * entries, or groups without a name, or null if nothing was skipped.
+         * All summaries come first, so they survive truncation.
+         */
+        internal fun skipWarning(
+            skippedEntries: Int,
+            skippedGroups: Int,
+            skipDetails: List<String>,
+            importFailures: List<String> = emptyList(),
+            imports: Int = 0
+        ): String? {
+            val skippedParts = listOfNotNull(
+                "$skippedEntries invalid ${if (skippedEntries == 1) "entry" else "entries"}".takeIf { skippedEntries > 0 },
+                "$skippedGroups invalid ${if (skippedGroups == 1) "group" else "groups"}".takeIf { skippedGroups > 0 }
+            )
+            val summaries = listOfNotNull(
+                "${importFailures.size} of $imports imports skipped".takeIf { importFailures.isNotEmpty() },
+                "${skippedParts.joinToString(" and ")} skipped".takeIf { skippedParts.isNotEmpty() }
+            )
+            if (summaries.isEmpty()) return null
+
+            // Details are capped where collected, so omissions are judged by the counts
+            val listed = skipDetails.take(BlocklistValidator.MAX_LISTED_SKIP_DETAILS)
+            val listedDetails = listed + listOfNotNull("…".takeIf { skippedEntries + skippedGroups > listed.size })
+            val details = (importFailures + listedDetails).joinToString("; ")
+            return "${summaries.joinToString(", ")}: $details"
+        }
+
+        /**
          * Resolved bundle—merged groups of all imported blocklists, plus metadata
-         * and an optional warning naming skipped imports.
+         * and an optional warning naming skipped imports, entries, and groups.
          */
         internal data class ResolvedBundle(
             val groups: Map<String, BlocklistGroup>,
@@ -174,8 +203,9 @@ class ExternalBlocklistManager(private val context: Context) {
         /**
          * Resolve a bundle by fetching and merging all imported blocklists.
          * Imports that are invalid, duplicates, or fail to load or validate
-         * are skipped with a warning; the refresh fails only if no import can
-         * be loaded, or if the merged result exceeds the blocklist limits.
+         * are skipped with a warning, as are invalid entries and groups without
+         * a name within imports; the refresh fails only if no import can be
+         * loaded, or if the merged result exceeds the blocklist limits.
          * Fetching is injected so the resolution logic can be tested without
          * a network.
          */
@@ -232,7 +262,7 @@ class ExternalBlocklistManager(private val context: Context) {
                             // with no suspension points, so `withTimeoutOrNull` alone can’t cut
                             // it off—cancellation is cooperative and only checked at suspension
                             // points. `runInterruptible` bridges that: on timeout it interrupts
-                            // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor
+                            // the underlying thread, which `OkHttp` (and `Thread.sleep`) honor.
                             var body: String? = null
                             var error: String? = null
                             for (attempt in 1..BUNDLE_IMPORT_MAX_ATTEMPTS) {
@@ -261,6 +291,9 @@ class ExternalBlocklistManager(private val context: Context) {
             // Validate and merge in import order, so the group ID prefixes stay deterministic
             val merged = linkedMapOf<String, BlocklistGroup>()
             val failures = mutableListOf<String>()
+            val skipDetails = mutableListOf<String>()
+            var skippedEntries = 0
+            var skippedGroups = 0
             var totalSize = bundleSize
             var importsLoaded = 0
 
@@ -287,12 +320,16 @@ class ExternalBlocklistManager(private val context: Context) {
                     if (BlocklistValidator.isBundle(importElement)) {
                         throw Exception("is itself a bundle—bundles may only import plain blocklists")
                     }
-                    val groups: Map<String, BlocklistGroup> = json.decodeFromString(importBody)
-                    val validation = BlocklistValidator.validateBlocklistFormat(groups)
+                    val validation = BlocklistValidator.validateBlocklist(importElement)
                     if (!validation.valid) {
                         throw Exception(validation.error)
                     }
-                    groups
+                    skippedEntries += validation.skippedEntries
+                    skippedGroups += validation.skippedGroups
+                    validation.skipped
+                        .take(BlocklistValidator.MAX_LISTED_SKIP_DETAILS - skipDetails.size)
+                        .forEach { skipDetails.add("${entry.importUrl}: $it") }
+                    validation.groups
                 } catch (e: Exception) {
                     failures.add("${entry.importUrl} (${e.message ?: e.javaClass.simpleName})")
                     null
@@ -325,11 +362,13 @@ class ExternalBlocklistManager(private val context: Context) {
                 imports = structureValidation.imports.size,
                 importsLoaded = importsLoaded
             )
-            val warning = if (failures.isNotEmpty()) {
-                "${failures.size} of ${structureValidation.imports.size} imports skipped: ${failures.joinToString("; ")}"
-            } else {
-                null
-            }
+            val warning = skipWarning(
+                skippedEntries,
+                skippedGroups,
+                skipDetails,
+                importFailures = failures,
+                imports = structureValidation.imports.size
+            )
             return ResolvedBundle(merged, metadata, warning)
         }
     }
@@ -346,9 +385,7 @@ class ExternalBlocklistManager(private val context: Context) {
         .followSslRedirects(false)
         .build()
 
-    /**
-     * System DNS restricted to publicly routable results.
-     */
+    // System DNS restricted to publicly routable results
     private fun publicOnlyDns(): Dns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
             val addresses = Dns.SYSTEM.lookup(hostname)
@@ -516,23 +553,28 @@ class ExternalBlocklistManager(private val context: Context) {
                 metadata = resolved.metadata
                 warning = resolved.warning
             } else {
-                // Parse into blocklist groups
-                val groups: Map<String, BlocklistGroup> = json.decodeFromString(body)
-
-                // Validate blocklist format (TLDs, domains, URLs)
-                val validationResult = BlocklistValidator.validateBlocklistFormat(groups)
+                // Validate blocklist format; invalid entries and groups without a
+                // name are skipped with a warning, and only what’s kept is cached
+                // and counted
+                val validationResult = BlocklistValidator.validateBlocklist(jsonElement)
                 if (!validationResult.valid) {
                     throw Exception("Validation failed: ${validationResult.error}")
                 }
-                bodyToCache = body
+                bodyToCache = json.encodeToString(validationResult.groups.orEmpty())
                 metadata = validationResult.metadata ?: BlocklistMetadata()
+                warning = skipWarning(
+                    validationResult.skippedEntries,
+                    validationResult.skippedGroups,
+                    validationResult.skipped
+                )
             }
 
             // Cache the blocklist (bundles are cached as their merged blocklist)
             writeCacheFile(id, bodyToCache)
 
-            // Update with success status and validated metadata; bundles with
-            // skipped imports stay active but carry a warning naming them
+            // Update with success status and validated metadata; blocklists with
+            // skipped entries, groups, or bundle imports stay active but carry a
+            // warning naming them
             updateBlocklist(config.copy(
                 lastUpdated = nowIso,
                 lastAttempted = nowIso,
@@ -556,10 +598,8 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Fetch URL with fallbacks for GitHub URLs.
-     * Tries: 1) Raw URL, 2) jsDelivr CDN, 3) GitHub API (base64 decode)
-     */
+    // Fetch URL with fallbacks for GitHub URLs.
+    // Tries: 1) Raw URL, 2) jsDelivr CDN, 3) GitHub API (base64 decode).
     private fun fetchWithFallbacks(primaryUrl: String, originalUrl: String): String {
         val errors = mutableListOf<String>()
 
@@ -606,9 +646,7 @@ class ExternalBlocklistManager(private val context: Context) {
         throw Exception("All fetch methods failed: ${errors.joinToString(", ")}")
     }
 
-    /**
-     * Fetch content from GitHub API and decode base64.
-     */
+    // Fetch content from GitHub API and decode base64
     private fun fetchGitHubApi(apiUrl: String): String? {
         val request = Request.Builder()
             .url(apiUrl)
@@ -636,9 +674,7 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Fetch a URL and return its body, or null if not successful.
-     */
+    // Fetch a URL and return its body, or null if not successful
     private fun fetchUrl(url: String): String? {
         val request = Request.Builder()
             .url(url)
@@ -661,11 +697,9 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Read a response body, refusing anything over [MAX_BLOCKLIST_SIZE].
-     * The declared content length can’t be relied on—a chunked response reports
-     * none, so the cap has to hold while reading rather than before it.
-     */
+    // Read a response body, refusing anything over `MAX_BLOCKLIST_SIZE`.
+    // The declared content length can’t be relied on—a chunked response reports
+    // none, so the cap has to hold while reading rather than before it.
     private fun readCapped(body: ResponseBody): String {
         val source = body.source()
         if (source.request(MAX_BLOCKLIST_SIZE + 1L)) {
@@ -687,14 +721,12 @@ class ExternalBlocklistManager(private val context: Context) {
         refreshBlocklists { true }
     }
 
-    /**
-     * Refresh the enabled blocklists matching (`shouldRefresh`), least recently
-     * attempted first, within one shared time budget—so several bad bundles
-     * can’t each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively
-     * run the periodic worker past its execution window, and a chronically
-     * slow or failing blocklist can’t claim the budget every pass and starve
-     * the configs after it.
-     */
+    // Refresh the enabled blocklists matching (`shouldRefresh`), least recently
+    // attempted first, within one shared time budget—so several bad bundles
+    // can’t each claim a fresh `BUNDLE_FETCH_TIME_BUDGET_MS` and collectively
+    // run the periodic worker past its execution window, and a chronically
+    // slow or failing blocklist can’t claim the budget every pass and starve
+    // the configs after it
     private suspend fun refreshBlocklists(shouldRefresh: (ExternalBlocklistConfig) -> Boolean) {
         val deadline = System.currentTimeMillis() + TOTAL_REFRESH_TIME_BUDGET_MS
         val configs = getConfigsSnapshot()
@@ -726,19 +758,17 @@ class ExternalBlocklistManager(private val context: Context) {
         migrateCacheFromPreferences(id)
     }
 
-    /**
-     * Where a blocklist’s rules are stored. Bodies live in files rather than in
-     * the preferences DataStore: that store is read and rewritten in full on
-     * every access, so keeping multi-megabyte lists in it would churn tens of
-     * megabytes for something as small as toggling one list on or off.
-     *
-     * IDs come from imported configs and are not trustworthy as file names, so
-     * the name is sanitized and disambiguated with a digest of the original.
-     * The digest is a cryptographic one because sanitizing is lossy: two IDs
-     * that differ only in stripped characters must not share a file, and
-     * `hashCode` collisions are easy enough to construct for an imported
-     * config to overwrite another list’s rules.
-     */
+    // Where a blocklist’s rules are stored. Bodies live in files rather than in
+    // the preferences DataStore: that store is read and rewritten in full on
+    // every access, so keeping multi-megabyte lists in it would churn tens of
+    // megabytes for something as small as toggling one list on or off.
+    //
+    // IDs come from imported configs and are not trustworthy as file names, so
+    // the name is sanitized and disambiguated with a digest of the original.
+    // The digest is a cryptographic one because sanitizing is lossy: two IDs
+    // that differ only in stripped characters must not share a file, and
+    // `hashCode` collisions are easy enough to construct for an imported
+    // config to overwrite another list’s rules.
     private fun cacheFile(id: String): File {
         val dir = File(context.filesDir, CACHE_DIR_NAME)
         val safeId = id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(64)
@@ -749,11 +779,9 @@ class ExternalBlocklistManager(private val context: Context) {
         return File(dir, "$safeId-$digest.json")
     }
 
-    /**
-     * Write a blocklist body, replacing any previous one. Written to a
-     * temporary file first so an interrupted write can’t leave a half-written
-     * list that would fail to parse on the next load.
-     */
+    // Write a blocklist body, replacing any previous one. Written to a
+    // temporary file first so an interrupted write can’t leave a half-written
+    // list that would fail to parse on the next load.
     private fun writeCacheFile(id: String, body: String) {
         val file = cacheFile(id)
         file.parentFile?.mkdirs()
@@ -765,10 +793,8 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    /**
-     * Move a body cached by an earlier version out of the DataStore and into a
-     * file, returning it. Returns null when there is nothing cached.
-     */
+    // Move a body cached by an earlier version out of the DataStore and into a
+    // file, returning it. Returns null when there is nothing cached.
     private suspend fun migrateCacheFromPreferences(id: String): String? {
         val key = stringPreferencesKey(BLOCKLIST_CACHE_PREFIX + id)
         val legacy = context.blocklistDataStore.data.first()[key] ?: return null

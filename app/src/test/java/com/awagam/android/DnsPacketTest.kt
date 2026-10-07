@@ -214,7 +214,7 @@ class DnsPacketTest {
     }
 
     @Test
-    fun `round-trip extract and wrap preserves structure`() {
+    fun `Preserves structure through an extract and wrap round trip`() {
         val dnsPayload = byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05)
         val queryPacket = buildDnsQueryPacket(
             srcIp = byteArrayOf(10, 0, 0, 2),
@@ -444,9 +444,7 @@ class DnsPacketTest {
         assertEquals(40, ipTotalLength)
     }
 
-    /**
-     * Build a minimal IPv4+UDP DNS query packet for testing.
-     */
+    // Build a minimal IPv4+UDP DNS query packet for testing
     private fun buildDnsQueryPacket(
         srcIp: ByteArray,
         dstIp: ByteArray,
@@ -497,9 +495,7 @@ class DnsPacketTest {
         return packet
     }
 
-    /**
-     * Build a minimal IPv4+TCP SYN packet for testing.
-     */
+    // Build a minimal IPv4+TCP SYN packet for testing
     private fun buildTcpSynPacket(
         srcIp: ByteArray,
         dstIp: ByteArray,

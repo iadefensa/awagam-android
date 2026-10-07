@@ -595,7 +595,7 @@ private data class Stat(
     val description: String
 )
 
-/** How the counts are sized, and whether that size fits three across. */
+// How the counts are sized, and whether that size fits three across
 private data class StatSizing(
     val valueStyle: TextStyle,
     val fitsInRow: Boolean
@@ -667,19 +667,17 @@ private fun StatCards(
     }
 }
 
-/**
- * Sizes the counts so that every one of [values] fits [available] on a single
- * line, and reports whether that succeeded. `formatCompact` already holds them
- * to four characters, which fits at the default font scale; this is what keeps
- * a raised scale or a narrow screen from breaking the row, since a number can
- * neither wrap—the card would grow taller than the two beside it—nor ellipsize,
- * which would misstate it.
- *
- * Stepping down from the full size rather than measuring per card is the point:
- * one size covers all three. The floor is in `sp`, so it still answers to the
- * font scale, and where even that overruns [available] the caller is told to
- * lay the cards out some other way instead of cutting a digit off.
- */
+// Sizes the counts so that every one of `values` fits `available` on a single
+// line, and reports whether that succeeded. `formatCompact` already holds them
+// to four characters, which fits at the default font scale; this is what keeps
+// a raised scale or a narrow screen from breaking the row, since a number can
+// neither wrap—the card would grow taller than the two beside it—nor ellipsize,
+// which would misstate it.
+//
+// Stepping down from the full size rather than measuring per card is the point:
+// one size covers all three. The floor is in `sp`, so it still answers to the
+// font scale, and where even that overruns `available` the caller is told to
+// lay the cards out some other way instead of cutting a digit off.
 @Composable
 private fun statSizing(values: List<String>, available: Dp): StatSizing {
     val measurer = rememberTextMeasurer()

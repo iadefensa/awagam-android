@@ -51,9 +51,7 @@ class DnsCache {
         }
     }
 
-    /**
-     * Generate cache key from DNS query.
-     */
+    // Generate cache key from DNS query
     private fun generateCacheKey(query: Message): String {
         val question = query.question ?: return ""
         val name = question.name.toString(true)

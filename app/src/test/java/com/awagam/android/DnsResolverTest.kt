@@ -80,7 +80,7 @@ class DnsResolverTest {
     private fun cacheSize(): Int = resolver.getCacheStats().size
 
     @Test
-    fun `a matching answer is served and cached`() {
+    fun `Serves and caches a matching answer`() {
         val wire = response().toWire()
 
         val accepted = resolver.acceptUpstreamResponse(query(), wire)
@@ -90,7 +90,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `question names match regardless of case`() {
+    fun `Question names match regardless of case`() {
         // DNS names compare case-insensitively; a resolver that echoes a query
         // back in different case (as 0x20 randomization does) must still match,
         // or every query would fail
@@ -103,7 +103,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `an answer to a different name is rejected and not cached`() {
+    fun `Rejects an answer to a different name without caching it`() {
         val wire = response(questionName = Name.fromString("other.example.")).toWire()
 
         assertNull(resolver.acceptUpstreamResponse(query(), wire))
@@ -111,7 +111,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `an answer for a different type is rejected and not cached`() {
+    fun `Rejects an answer for a different type without caching it`() {
         val wire = response(type = Type.AAAA).toWire()
 
         assertNull(resolver.acceptUpstreamResponse(query(type = Type.A), wire))
@@ -119,7 +119,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `a response without a question is rejected`() {
+    fun `Rejects a response without a question`() {
         val bare = Message(0x1234)
         bare.header.setFlag(Flags.QR.toInt())
 
@@ -128,7 +128,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `a message without the QR flag is rejected and not cached`() {
+    fun `Rejects a message without the QR flag without caching it`() {
         // A query echoed back would otherwise pass every other check: It parses,
         // its question matches, and it carries the default NOERROR
         val wire = response(isResponse = false, withAnswer = false).toWire()
@@ -138,7 +138,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `an unparsable response is rejected`() {
+    fun `Rejects an unparsable response`() {
         val garbage = byteArrayOf(0x01, 0x02, 0x03)
 
         assertNull(resolver.acceptUpstreamResponse(query(), garbage))
@@ -146,7 +146,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `SERVFAIL is passed through but not cached`() {
+    fun `Passes SERVFAIL through without caching it`() {
         val wire = response(rcode = Rcode.SERVFAIL, withAnswer = false).toWire()
 
         assertArrayEquals(wire, resolver.acceptUpstreamResponse(query(), wire))
@@ -154,7 +154,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `a truncated answer is passed through but not cached`() {
+    fun `Passes a truncated answer through without caching it`() {
         val wire = response(truncated = true).toWire()
 
         assertArrayEquals(wire, resolver.acceptUpstreamResponse(query(), wire))
@@ -162,7 +162,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `NXDOMAIN is cached`() {
+    fun `Caches NXDOMAIN`() {
         val wire = response(rcode = Rcode.NXDOMAIN, withAnswer = false).toWire()
 
         assertArrayEquals(wire, resolver.acceptUpstreamResponse(query(), wire))
@@ -170,7 +170,7 @@ class DnsResolverTest {
     }
 
     @Test
-    fun `a mismatched transaction ID is patched without touching the cached copy`() {
+    fun `Patches a mismatched transaction ID without touching the cached copy`() {
         val wire = response(id = 0x0000).toWire()
         val original = wire.copyOf()
 

@@ -126,12 +126,10 @@ class StatisticsManager(private val context: Context) {
         val lastQueried: Long
     )
 
-    /**
-     * Paces UI updates. Recording no longer writes to disk on every query, so
-     * the DataStore alone would only re-emit once per flush and leave the
-     * displayed counters frozen in between. This is cold: it ticks only while a
-     * screen is collecting, and costs nothing when none is.
-     */
+    // Paces UI updates. Recording no longer writes to disk on every query, so
+    // the DataStore alone would only re-emit once per flush and leave the
+    // displayed counters frozen in between. This is cold: It ticks only while a
+    // screen is collecting, and costs nothing when none is.
     private val displayTicker: Flow<Unit> = flow {
         while (true) {
             emit(Unit)
@@ -139,7 +137,7 @@ class StatisticsManager(private val context: Context) {
         }
     }
 
-    // Flow of current statistics
+    /** Flow of current statistics */
     val statisticsFlow: Flow<Statistics> = combine(
         context.statisticsDataStore.data,
         refreshTrigger,
@@ -187,10 +185,8 @@ class StatisticsManager(private val context: Context) {
     suspend fun currentBlockedQueries(): Long =
         context.statisticsDataStore.data.first().counter(BLOCKED_QUERIES) + pendingBlocked.get()
 
-    /**
-     * Read a counter. `Preferences.Key` compares by name, so the stored entry
-     * is found whichever type it was written as.
-     */
+    // Read a counter. `Preferences.Key` compares by name, so the stored entry
+    // is found whichever type it was written as.
     private fun Preferences.counter(key: Preferences.Key<Long>): Long =
         counterValue(asMap()[key])
 
@@ -232,10 +228,8 @@ class StatisticsManager(private val context: Context) {
         scheduleFlush()
     }
 
-    /**
-     * Schedule a flush unless one is already pending. Deferring instead of
-     * running a fixed timer means an idle app never wakes up to write nothing.
-     */
+    // Schedule a flush unless one is already pending. Deferring instead of
+    // running a fixed timer means an idle app never wakes up to write nothing.
     private fun scheduleFlush() {
         if (flushJob != null) return
         synchronized(this) {
@@ -300,7 +294,7 @@ class StatisticsManager(private val context: Context) {
                 // Deliberately not rethrown: every caller is fire-and-forget, and
                 // an escaping exception from a launched coroutine reaches the
                 // thread’s uncaught handler and takes the process down. Losing
-                // statistics is never worth killing the VPN over
+                // statistics is never worth killing the VPN over.
                 Log.w(TAG, "Failed to write statistics, keeping the counts pending", e)
             }
         }
@@ -327,9 +321,7 @@ class StatisticsManager(private val context: Context) {
         synchronized(this) { flushJob = null }
     }
 
-    /**
-     * Clear in-memory session counters.
-     */
+    // Clear in-memory session counters
     private fun clearSessionCounters() {
         sessionQueries.set(0)
         sessionBlocked.set(0)

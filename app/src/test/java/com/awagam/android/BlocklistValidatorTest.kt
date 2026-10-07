@@ -3,7 +3,9 @@
 
 package com.awagam.android
 
+import android.app.Application
 import com.awagam.android.data.blocklist.BlocklistGroup
+import com.awagam.android.data.blocklist.BlocklistMetadata
 import com.awagam.android.data.blocklist.BlocklistValidator
 import com.awagam.android.data.blocklist.ExternalBlocklistConfig
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
@@ -13,36 +15,41 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.net.InetAddress
 
 /**
  * Unit tests for BlocklistValidator.
  * Tests URL validation, TLD/domain format validation, and security checks.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class BlocklistValidatorTest {
 
     // URL Validation Tests
 
     @Test
-    fun `valid HTTPS URLs are accepted`() {
+    fun `Accepts valid HTTPS URLs`() {
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://example.com/blocklist.json"))
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://raw.githubusercontent.com/user/repo/main/file.json"))
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://gitlab.com/user/repo/-/raw/main/file.json"))
     }
 
     @Test
-    fun `HTTP URLs are rejected`() {
+    fun `Rejects HTTP URLs`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("http://example.com/blocklist.json"))
     }
 
     @Test
-    fun `localhost URLs are rejected`() {
+    fun `Rejects localhost URLs`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://localhost/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://127.0.0.1/blocklist.json"))
     }
 
     @Test
-    fun `private IP ranges are rejected`() {
+    fun `Rejects private IP ranges`() {
         // 10.0.0.0/8
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://10.0.0.1/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://10.255.255.255/blocklist.json"))
@@ -57,7 +64,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `internal domains are rejected`() {
+    fun `Rejects internal domains`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://myserver.local/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://server.internal/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://server.corp/blocklist.json"))
@@ -65,14 +72,14 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `loopback addresses are rejected beyond the canonical one`() {
+    fun `Rejects loopback addresses beyond the canonical one`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://127.0.0.2/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://127.255.255.254/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[::1]/blocklist.json"))
     }
 
     @Test
-    fun `IPv6 private and link-local addresses are rejected`() {
+    fun `Rejects IPv6 private and link-local addresses`() {
         // Unique local addresses, fc00::/7
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[fd00::1]/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://[fc00::1]/blocklist.json"))
@@ -85,13 +92,13 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `link-local addresses including the metadata endpoint are rejected`() {
+    fun `Rejects link-local addresses including the metadata endpoint`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://169.254.169.254/latest/meta-data"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://169.254.0.1/blocklist.json"))
     }
 
     @Test
-    fun `other reserved ranges are rejected`() {
+    fun `Rejects other reserved ranges`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://0.0.0.0/blocklist.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("https://0.1.2.3/blocklist.json"))
         // CGNAT, 100.64.0.0/10
@@ -108,7 +115,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `public addresses stay allowed`() {
+    fun `Public addresses stay allowed`() {
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://1.1.1.1/blocklist.json"))
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://100.63.255.255/blocklist.json"))
         assertTrue(BlocklistValidator.isValidBlocklistUrl("https://192.0.1.1/blocklist.json"))
@@ -116,7 +123,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `hostnames are not treated as IP literals`() {
+    fun `Does not treat hostnames as IP literals`() {
         assertNull(BlocklistValidator.parseIpLiteral("example.com"))
         assertNull(BlocklistValidator.parseIpLiteral("1.1.1.1.example.com"))
         assertNotNull(BlocklistValidator.parseIpLiteral("1.1.1.1"))
@@ -124,7 +131,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `resolved addresses are classified for the fetch-time check`() {
+    fun `Classifies resolved addresses for the fetch-time check`() {
         assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("10.1.2.3")))
         assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("169.254.169.254")))
         assertTrue(BlocklistValidator.isBlockedAddress(InetAddress.getByName("::1")))
@@ -134,7 +141,7 @@ class BlocklistValidatorTest {
     // Bundle Validation Tests
 
     @Test
-    fun `bundles are detected by imports array`() {
+    fun `Detects bundles by an imports array`() {
         val bundle = Json.parseToJsonElement("""{"imports": ["https://example.com/a.json"]}""")
         assertTrue(BlocklistValidator.isBundle(bundle))
 
@@ -147,7 +154,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `valid bundles are accepted`() {
+    fun `Accepts valid bundles`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json", "https://example.com/b.json"]}"""
         )
@@ -160,7 +167,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `bundles with extra fields are rejected`() {
+    fun `Rejects bundles with extra fields`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json"], "name": "Extra"}"""
         )
@@ -169,21 +176,21 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `empty bundles are rejected`() {
+    fun `Rejects empty bundles`() {
         val bundle = Json.parseToJsonElement("""{"imports": []}""")
         val result = BlocklistValidator.validateBundleFormat(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `bundles with insecure import URLs are rejected`() {
+    fun `Rejects bundles with insecure import URLs`() {
         val bundle = Json.parseToJsonElement("""{"imports": ["http://example.com/a.json"]}""")
         val result = BlocklistValidator.validateBundleFormat(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `bundles with insecure import URLs are rejected even if normalization would fix them`() {
+    fun `Rejects bundles with insecure import URLs even if normalization would fix them`() {
         val bundle = Json.parseToJsonElement("""{"imports": ["http://example.com/a.json"]}""")
         val result = BlocklistValidator.validateBundleFormat(bundle) {
             it.replace("http://", "https://")
@@ -192,7 +199,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `bundles with duplicate import URLs are rejected`() {
+    fun `Rejects bundles with duplicate import URLs`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json", "https://example.com/a.json"]}"""
         )
@@ -201,7 +208,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `bundles with duplicate imports via different URL representations are rejected`() {
+    fun `Rejects bundles with duplicate imports via different URL representations`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://github.com/user/repo/blob/main/list.json", "https://raw.githubusercontent.com/user/repo/main/list.json"]}"""
         )
@@ -212,7 +219,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `bundles with too many imports are rejected`() {
+    fun `Rejects bundles with too many imports`() {
         val urls = (1..101).joinToString(", ") { "\"https://example.com/$it.json\"" }
         val bundle = Json.parseToJsonElement("""{"imports": [$urls]}""")
         val result = BlocklistValidator.validateBundleFormat(bundle)
@@ -220,14 +227,14 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `bundles with non-string imports are rejected`() {
+    fun `Rejects bundles with non-string imports`() {
         val bundle = Json.parseToJsonElement("""{"imports": [42]}""")
         val result = BlocklistValidator.validateBundleFormat(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `invalid URLs are rejected`() {
+    fun `Rejects invalid URLs`() {
         assertFalse(BlocklistValidator.isValidBlocklistUrl("not-a-url"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl("ftp://example.com/file.json"))
         assertFalse(BlocklistValidator.isValidBlocklistUrl(""))
@@ -236,7 +243,7 @@ class BlocklistValidatorTest {
     // TLD Validation Tests
 
     @Test
-    fun `valid TLDs are accepted`() {
+    fun `Accepts valid TLDs`() {
         assertTrue(BlocklistValidator.isValidTld(".com"))
         assertTrue(BlocklistValidator.isValidTld(".ru"))
         assertTrue(BlocklistValidator.isValidTld(".co.uk"))
@@ -245,13 +252,13 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `TLDs without leading dot are rejected`() {
+    fun `Rejects TLDs without a leading dot`() {
         assertFalse(BlocklistValidator.isValidTld("com"))
         assertFalse(BlocklistValidator.isValidTld("ru"))
     }
 
     @Test
-    fun `invalid TLDs are rejected`() {
+    fun `Rejects invalid TLDs`() {
         assertFalse(BlocklistValidator.isValidTld("."))
         assertFalse(BlocklistValidator.isValidTld(".-invalid"))
         assertFalse(BlocklistValidator.isValidTld(".invalid-"))
@@ -262,7 +269,7 @@ class BlocklistValidatorTest {
     // Domain Validation Tests
 
     @Test
-    fun `valid domains are accepted`() {
+    fun `Accepts valid domains`() {
         assertTrue(BlocklistValidator.isValidDomain("example.com"))
         assertTrue(BlocklistValidator.isValidDomain("sub.example.com"))
         assertTrue(BlocklistValidator.isValidDomain("deep.sub.example.com"))
@@ -271,21 +278,36 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `IDN domains are accepted`() {
+    fun `Accepts IDN domains`() {
         assertTrue(BlocklistValidator.isValidDomain("münchen.de"))
         assertTrue(BlocklistValidator.isValidDomain("xn--mnchen-3ya.de")) // Punycode
         assertTrue(BlocklistValidator.isValidDomain("example.рф"))
+        assertTrue(BlocklistValidator.isValidDomain("straße.de"))
+        assertTrue(BlocklistValidator.isValidDomain("r3---sn-abc.googlevideo.com"))
     }
 
     @Test
-    fun `partial IP patterns are accepted for range blocking`() {
+    fun `Rejects IDN domains failing browser BiDi or ContextJ rules`() {
+        assertFalse(BlocklistValidator.isValidDomain("0a.\u05D0")) // Leading digit in a BiDi domain
+        assertFalse(BlocklistValidator.isValidDomain("a\u200Cb.com")) // ZWNJ outside its allowed context
+        assertTrue(BlocklistValidator.isValidDomain("\u05D0\u05D1.com")) // Hebrew label
+        assertTrue(BlocklistValidator.isValidDomain("\u0915\u094D\u200C\u0937.com")) // ZWNJ after virama
+    }
+
+    @Test
+    fun `Rejects IDN domains with overlong labels`() {
+        assertFalse(BlocklistValidator.isValidDomain("${"ü".repeat(64)}.de"))
+    }
+
+    @Test
+    fun `Accepts partial IP patterns for range blocking`() {
         assertTrue(BlocklistValidator.isValidDomain("192.168."))
         assertTrue(BlocklistValidator.isValidDomain("10.0."))
         assertTrue(BlocklistValidator.isValidDomain("142.91.159."))
     }
 
     @Test
-    fun `invalid domains are rejected`() {
+    fun `Rejects invalid domains`() {
         assertFalse(BlocklistValidator.isValidDomain(""))
         assertFalse(BlocklistValidator.isValidDomain("-invalid.com"))
         assertFalse(BlocklistValidator.isValidDomain("invalid-.com"))
@@ -295,7 +317,7 @@ class BlocklistValidatorTest {
     // DNS Label Validation Tests
 
     @Test
-    fun `valid DNS labels are accepted`() {
+    fun `Accepts valid DNS labels`() {
         assertTrue(BlocklistValidator.isValidDnsLabel("example"))
         assertTrue(BlocklistValidator.isValidDnsLabel("ex-ample"))
         assertTrue(BlocklistValidator.isValidDnsLabel("123"))
@@ -303,20 +325,20 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `DNS labels with invalid characters are rejected`() {
+    fun `Rejects DNS labels with invalid characters`() {
         assertFalse(BlocklistValidator.isValidDnsLabel("invalid_label"))
         assertFalse(BlocklistValidator.isValidDnsLabel("invalid label"))
         assertFalse(BlocklistValidator.isValidDnsLabel("invalid.label"))
     }
 
     @Test
-    fun `DNS labels starting or ending with hyphen are rejected`() {
+    fun `Rejects DNS labels starting or ending with a hyphen`() {
         assertFalse(BlocklistValidator.isValidDnsLabel("-invalid"))
         assertFalse(BlocklistValidator.isValidDnsLabel("invalid-"))
     }
 
     @Test
-    fun `DNS labels exceeding 63 characters are rejected`() {
+    fun `Rejects DNS labels exceeding 63 characters`() {
         val longLabel = "a".repeat(64)
         assertFalse(BlocklistValidator.isValidDnsLabel(longLabel))
 
@@ -327,7 +349,7 @@ class BlocklistValidatorTest {
     // Blocklist Entry (URL) Validation Tests
 
     @Test
-    fun `valid blocklist URL entries are accepted`() {
+    fun `Accepts valid blocklist URL entries`() {
         assertTrue(BlocklistValidator.isValidBlocklistEntry("https://example.com/path"))
         assertTrue(BlocklistValidator.isValidBlocklistEntry("http://example.com/path"))
         assertTrue(BlocklistValidator.isValidBlocklistEntry("example.com/path"))
@@ -335,7 +357,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `blocklist entries with whitespace are rejected`() {
+    fun `Rejects blocklist entries with whitespace`() {
         assertFalse(BlocklistValidator.isValidBlocklistEntry("example.com/path with spaces"))
         assertFalse(BlocklistValidator.isValidBlocklistEntry(" example.com/path"))
     }
@@ -343,7 +365,7 @@ class BlocklistValidatorTest {
     // JSON Depth Validation Tests
 
     @Test
-    fun `shallow JSON passes depth validation`() {
+    fun `Shallow JSON passes depth validation`() {
         val shallow = JsonObject(mapOf(
             "key" to JsonPrimitive("value")
         ))
@@ -351,7 +373,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `nested JSON within limits passes`() {
+    fun `Nested JSON within limits passes`() {
         // Create a JSON object with depth 10
         var current: kotlinx.serialization.json.JsonElement = JsonPrimitive("value")
         for (i in 1..10) {
@@ -363,21 +385,21 @@ class BlocklistValidatorTest {
     // Size Validation Tests
 
     @Test
-    fun `content within size limit passes`() {
+    fun `Content within size limit passes`() {
         val smallContent = "a".repeat(1000)
         assertTrue(BlocklistValidator.validateSize(smallContent))
     }
 
     @Test
-    fun `content exceeding size limit fails`() {
+    fun `Content exceeding size limit fails`() {
         val largeContent = "a".repeat(11 * 1024 * 1024) // 11 MB
         assertFalse(BlocklistValidator.validateSize(largeContent))
     }
 
-    // Blocklist Format Validation Tests
+    // Strict Blocklist Validation Tests
 
     @Test
-    fun `a blocklist whose only group is named imports validates as a blocklist`() {
+    fun `Strict validation accepts a blocklist whose only group is named imports`() {
         // The bundle format is disambiguated by type—“imports” as a group
         // (an object) must keep working as a plain blocklist
         val groups = mapOf(
@@ -393,7 +415,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `valid blocklist format passes`() {
+    fun `Strict validation passes a valid blocklist`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -413,7 +435,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `blocklist with invalid TLD fails validation`() {
+    fun `Strict validation fails on an invalid TLD`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -427,7 +449,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `blocklist with invalid domain fails validation`() {
+    fun `Strict validation fails on an invalid domain`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "Test Group",
@@ -441,7 +463,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `blocklist with missing name fails validation`() {
+    fun `Strict validation fails on a missing name`() {
         val groups = mapOf(
             "test" to BlocklistGroup(
                 name = "", // Empty name
@@ -454,10 +476,122 @@ class BlocklistValidatorTest {
         assertTrue(result.error?.contains("missing required") == true)
     }
 
+    // Tolerant Blocklist Validation Tests
+
+    private val mixedBlocklist = Json.parseToJsonElement(
+        """
+        {
+            "good": {
+                "name": "Good",
+                "context": "Kept as is",
+                "tlds": [".ru", "invalid-tld"],
+                "domains": ["example.com", "-invalid.com", 42, {"nested": true}],
+                "urls": ["example.org/path", "https://exa mple.org/"]
+            },
+            "nameless": {"tlds": [".cn"], "domains": ["nameless.com"]},
+            "blank": {"name": " ", "domains": ["blank.com"]},
+            "numeric": {"name": 1, "domains": ["numeric.com"]}
+        }
+        """
+    )
+
+    @Test
+    fun `Skips invalid entries and nameless groups`() {
+        val result = BlocklistValidator.validateBlocklist(mixedBlocklist)
+        assertTrue(result.valid)
+        assertEquals(
+            mapOf(
+                "good" to BlocklistGroup(
+                    name = "Good",
+                    context = JsonPrimitive("Kept as is"),
+                    tlds = listOf(".ru"),
+                    domains = listOf("example.com"),
+                    urls = listOf("example.org/path")
+                )
+            ),
+            result.groups
+        )
+        assertEquals(
+            listOf(
+                "Invalid TLD in group \"good\": invalid-tld",
+                "Invalid domain in group \"good\": -invalid.com",
+                "Group \"good\".domains contains non-string item",
+                "Group \"good\".domains contains non-string item",
+                "Invalid URL in group \"good\": https://exa mple.org/",
+                "Group \"nameless\" missing required \"name\" field",
+                "Group \"blank\" missing required \"name\" field",
+                "Group \"numeric\" missing required \"name\" field"
+            ),
+            result.skipped
+        )
+    }
+
+    @Test
+    fun `Counts include only the entries and groups that are kept`() {
+        val result = BlocklistValidator.validateBlocklist(mixedBlocklist)
+        assertEquals(BlocklistMetadata(totalRules = 3, tlds = 1, domains = 1, urls = 1, groups = 1), result.metadata)
+        assertEquals(5, result.skippedEntries)
+        assertEquals(3, result.skippedGroups)
+    }
+
+    @Test
+    fun `Caps skip details at the display limit while counts stay exact`() {
+        val invalidTlds = (0 until 25).joinToString(",") { "\"bad tld $it\"" }
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "tlds": [$invalidTlds]}}""")
+        )
+        assertEquals(25, result.skippedEntries)
+        assertEquals(BlocklistValidator.MAX_LISTED_SKIP_DETAILS, result.skipped.size)
+        assertEquals("Invalid TLD in group \"g\": bad tld 0", result.skipped.first())
+    }
+
+    @Test
+    fun `Blocklists without invalid entries skip nothing`() {
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "tlds": [".ru"], "domains": ["example.com"]}}""")
+        )
+        assertTrue(result.valid)
+        assertEquals(emptyList<String>(), result.skipped)
+        assertEquals(2, result.metadata?.totalRules)
+    }
+
+    @Test
+    fun `Accepts blocklists whose entries are all invalid`() {
+        val result = BlocklistValidator.validateBlocklist(
+            Json.parseToJsonElement("""{"g": {"name": "G", "domains": ["-invalid.com"]}}""")
+        )
+        assertTrue(result.valid)
+        assertEquals(mapOf("g" to BlocklistGroup(name = "G")), result.groups)
+        assertEquals(0, result.metadata?.totalRules)
+    }
+
+    @Test
+    fun `Group limit applies to the groups that are kept`() {
+        val groups = (0 until 100).associate { "g$it" to JsonObject(mapOf("name" to JsonPrimitive("G$it"))) }
+        val withNameless = JsonObject(groups + ("nameless" to JsonObject(emptyMap())))
+        assertTrue(BlocklistValidator.validateBlocklist(withNameless).valid)
+        val withExtra = JsonObject(groups + ("extra" to JsonObject(mapOf("name" to JsonPrimitive("Extra")))))
+        assertFalse(BlocklistValidator.validateBlocklist(withExtra).valid)
+    }
+
+    @Test
+    fun `Tolerant validation still fails on structural errors`() {
+        for ((input, error) in listOf(
+            "[]" to "Root must be an object",
+            """{"g": "G"}""" to "Group \"g\" must be an object",
+            """{"g": {"name": "G", "domains": "example.com"}}""" to "Group \"g\".domains must be an array",
+            """{"g": {"name": "G", "urls": null}}""" to "Group \"g\".urls must be an array"
+        )) {
+            val result = BlocklistValidator.validateBlocklist(Json.parseToJsonElement(input))
+            assertFalse(input, result.valid)
+            assertEquals(error, result.error)
+        }
+    }
+
     // Config Sanitization Tests
 
     @Test
-    fun `config name is truncated and sanitized`() {
+    fun `Truncates and sanitizes the config name`() {
         val longName = "a".repeat(300) + "<script>alert('xss')</script>"
         val config = ExternalBlocklistConfig(
             id = "test",
@@ -472,7 +606,7 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `error message is truncated and sanitized`() {
+    fun `Truncates and sanitizes the error message`() {
         val longError = "Error: " + "a".repeat(600) + "<script>bad</script>"
         val config = ExternalBlocklistConfig(
             id = "test",

@@ -55,7 +55,7 @@ class AWAGAMVpnService : VpnService() {
         // Upper bound on queries being resolved at once. Each in-flight query
         // holds a packet copy and can wait up to 5 s on a DoH call, so an app
         // flooding the tunnel would otherwise grow memory without limit and
-        // saturate the OkHttp dispatcher, slowing down every other query
+        // saturate the OkHttp dispatcher, slowing down every other query.
         private const val MAX_CONCURRENT_QUERIES = 32
 
         // The probe runs right after the tunnel comes up, when routing may still
@@ -182,7 +182,7 @@ class AWAGAMVpnService : VpnService() {
             Log.d(TAG, "VPN already running")
             // A live tunnel with the preference still off leaves the toggle stuck:
             // Every tap lands here and returns, so nothing ever writes the
-            // preference the switch reads. Re-assert it instead of returning silently
+            // preference the switch reads. Re-assert it instead of returning silently.
             if (vpnInterface != null) {
                 pendingStop = false
                 serviceScope.launch {
@@ -314,14 +314,12 @@ class AWAGAMVpnService : VpnService() {
         }
     }
 
-    /**
-     * Establish the tunnel, retrying with backoff while the platform settles.
-     * `establish()` is documented to return null when another VPN holds the
-     * connection, but it also does so briefly after boot on a stack that is not
-     * ready yet, and those two are indistinguishable from here—so exhaust the
-     * retries before treating a null as final. Only null is retried; a thrown
-     * exception describes the configuration, which no amount of waiting changes.
-     */
+    // Establish the tunnel, retrying with backoff while the platform settles.
+    // `establish()` is documented to return null when another VPN holds the
+    // connection, but it also does so briefly after boot on a stack that is not
+    // ready yet, and those two are indistinguishable from here—so exhaust the
+    // retries before treating a null as final. Only null is retried; a thrown
+    // exception describes the configuration, which no amount of waiting changes.
     private suspend fun establishVpnWithRetry(): ParcelFileDescriptor? {
         var retryDelayMs = ESTABLISH_RETRY_DELAY_MS
         repeat(ESTABLISH_ATTEMPTS) { attempt ->
@@ -335,12 +333,10 @@ class AWAGAMVpnService : VpnService() {
         return null
     }
 
-    /**
-     * Report a failed start and tear down.
-     * The preference writes are guarded because failing to persist them must not
-     * skip the teardown: that would strand an open tunnel behind a UI that says
-     * protection is off, with no way to recover from the toggle.
-     */
+    // Report a failed start and tear down.
+    // The preference writes are guarded because failing to persist them must not
+    // skip the teardown: that would strand an open tunnel behind a UI that says
+    // protection is off, with no way to recover from the toggle.
     private suspend fun failStartup(error: String) {
         isRunning = false
         isServiceRunning = false
@@ -364,12 +360,10 @@ class AWAGAMVpnService : VpnService() {
         stopSelf()
     }
 
-    /**
-     * Build and establish the tunnel. Exceptions are left to propagate: A
-     * rejected address, route, or MTU is a fixed property of this configuration,
-     * so it would fail the same way on every retry, and swallowing it here would
-     * disguise it as the transient null that retrying does answer.
-     */
+    // Build and establish the tunnel. Exceptions are left to propagate: A
+    // rejected address, route, or MTU is a fixed property of this configuration,
+    // so it would fail the same way on every retry, and swallowing it here would
+    // disguise it as the transient null that retrying does answer.
     private fun establishVpn(): ParcelFileDescriptor? {
         return Builder()
             .setSession("AWAGAM")
@@ -383,16 +377,14 @@ class AWAGAMVpnService : VpnService() {
             .establish()
     }
 
-    /**
-     * Creates a socket factory that protects sockets from being routed through the VPN.
-     * This is essential for DoH requests to avoid infinite loops.
-     *
-     * Important: `protect()` must be called before the socket connects.
-     * Socket constructors with host/port connect immediately, so we must:
-     * 1. Create an unconnected socket
-     * 2. Protect it
-     * 3. Connect it
-     */
+    // Creates a socket factory that protects sockets from being routed through the VPN.
+    // This is essential for DoH requests to avoid infinite loops.
+    //
+    // Important: `protect()` must be called before the socket connects.
+    // Socket constructors with host/port connect immediately, so we must:
+    // 1. Create an unconnected socket
+    // 2. Protect it
+    // 3. Connect it
     private fun createProtectedSocketFactory(): SocketFactory {
         val vpnService = this
         return object : SocketFactory() {
@@ -495,8 +487,8 @@ class AWAGAMVpnService : VpnService() {
         }
 
         // Reject DNS-over-TLS probes (TCP SYN to port 853) with a RST so that
-        // Android's Private DNS "Automatic" mode falls back to plain DNS immediately
-        // instead of waiting for a connection timeout.
+        // Android’s Private DNS “Automatic” mode falls back to plain DNS immediately
+        // instead of waiting for a connection timeout
         if (DnsResolver.isTcpSynToPort853(packet, length)) {
             return DnsResolver.createTcpRst(packet, length)
         }
@@ -574,11 +566,9 @@ class AWAGAMVpnService : VpnService() {
         stopSelf()
     }
 
-    /**
-     * Build the ongoing notification.
-     * Kept free of suspending work so the caller can post it without delay;
-     * `text` is prepared separately by `notificationText()`.
-     */
+    // Build the ongoing notification.
+    // Kept free of suspending work so the caller can post it without delay;
+    // `text` is prepared separately by `notificationText()`.
     private fun buildNotification(text: String): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -596,11 +586,9 @@ class AWAGAMVpnService : VpnService() {
             .build()
     }
 
-    /**
-     * Compose the notification’s second line: lifetime blocked requests, then the
-     * loaded rule count. “Rules” rather than “domains” because the count covers
-     * both TLD and domain entries, matching what the home screen reports.
-     */
+    // Compose the notification’s second line: lifetime blocked requests, then the
+    // loaded rule count. “Rules” rather than “domains” because the count covers
+    // both TLD and domain entries, matching what the home screen reports.
     private suspend fun notificationText(): String {
         val stats = blocklistRepository.blocklistStats.value
         val totalRules = stats.tldCount + stats.domainCount
@@ -621,13 +609,11 @@ class AWAGAMVpnService : VpnService() {
         return getString(R.string.vpn_notification_text, blockedText, rulesText)
     }
 
-    /**
-     * Keep the notification’s counts current while the tunnel runs.
-     * Polled rather than driven by `statisticsFlow`, whose 1 Hz display ticker
-     * would then run for the whole session; the interval matches the statistics
-     * flush cadence, so the notification never shows a number that is fresher
-     * than what the app itself has recorded.
-     */
+    // Keep the notification’s counts current while the tunnel runs.
+    // Polled rather than driven by `statisticsFlow`, whose 1 Hz display ticker
+    // would then run for the whole session; the interval matches the statistics
+    // flush cadence, so the notification never shows a number that is fresher
+    // than what the app itself has recorded.
     private fun startNotificationUpdates() {
         notificationJob?.cancel()
         notificationJob = serviceScope.launch {
@@ -638,12 +624,11 @@ class AWAGAMVpnService : VpnService() {
         }
     }
 
-    /**
-     * Refresh the posted notification, unless nothing changed or the user swiped
-     * it away. Android 13 and later let them dismiss it while the tunnel keeps
-     * running; re-posting would resurrect a notification they deliberately
-     * dismissed, and the system’s VPN key icon still discloses that the tunnel is up.
-     */
+    // Refresh the posted notification, unless nothing changed or the user swiped
+    // it away. Android 13 and later let them dismiss it while the tunnel keeps
+    // running; re-posting would resurrect a notification they deliberately
+    // dismissed, and the system’s VPN key icon still discloses that the tunnel
+    // is up.
     private suspend fun updateNotification() {
         val text = notificationText()
         if (text == postedText) return

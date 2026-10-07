@@ -53,7 +53,7 @@ class StatisticsManagerTest {
         manager().statisticsFlow.first()
 
     @Test
-    fun `recorded queries are visible before they are flushed`() = runTest {
+    fun `Shows recorded queries before they are flushed`() = runTest {
         val statistics = manager()
         val before = statistics.statisticsFlow.first()
 
@@ -72,7 +72,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `flushed counts survive a new manager instance`() = runTest {
+    fun `Flushed counts survive a new manager instance`() = runTest {
         val before = stored()
 
         val statistics = manager()
@@ -89,7 +89,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `flushing twice does not count the same queries again`() = runTest {
+    fun `Does not count the same queries again when flushed twice`() = runTest {
         val before = stored()
 
         val statistics = manager()
@@ -101,7 +101,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `the flow re-emits on its own so the UI does not freeze between flushes`() = runTest {
+    fun `The flow re-emits on its own so the UI does not freeze between flushes`() = runTest {
         // Recording only touches memory, so without a periodic re-emission the
         // displayed counters would sit still until the next flush
         val emissions = manager().statisticsFlow.take(3).toList()
@@ -110,7 +110,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `a stored counter reads as a Long whichever type it was written as`() {
+    fun `A stored counter reads as a Long whichever type it was written as`() {
         assertEquals(42L, counterValue(42L))
         assertEquals(42L, counterValue(42))
         assertEquals(0L, counterValue(null))
@@ -118,7 +118,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `a negative stored counter reads as zero`() {
+    fun `A negative stored counter reads as zero`() {
         // Nothing here subtracts, so a negative means the file was written by
         // something other than this app; the displays all assume counts
         assertEquals(0L, counterValue(-1L))
@@ -127,7 +127,7 @@ class StatisticsManagerTest {
     }
 
     @Test
-    fun `resetting the session keeps lifetime totals`() = runTest {
+    fun `Keeps lifetime totals when the session is reset`() = runTest {
         val statistics = manager()
         val before = statistics.statisticsFlow.first()
 

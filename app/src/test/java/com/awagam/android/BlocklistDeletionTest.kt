@@ -85,7 +85,7 @@ class BlocklistDeletionTest {
     // Deletion Impact Tests
 
     @Test
-    fun `a plain list warns about nothing beyond itself`() {
+    fun `A plain list warns about nothing beyond itself`() {
         assertNull(
             "A list that imports nothing costs only its own entry",
             config(metadata = BlocklistMetadata(totalRules = 10, domains = 10)).deletionImpact()
@@ -93,7 +93,7 @@ class BlocklistDeletionTest {
     }
 
     @Test
-    fun `a list never refreshed warns about nothing beyond itself`() {
+    fun `A list never refreshed warns about nothing beyond itself`() {
         assertNull(
             "Metadata is absent until the first refresh, and absence is not a bundle",
             config(metadata = null).deletionImpact()
@@ -101,7 +101,7 @@ class BlocklistDeletionTest {
     }
 
     @Test
-    fun `a bundle warns with the number of lists that go with it`() {
+    fun `A bundle warns with the number of lists that go with it`() {
         val impact = config(
             metadata = BlocklistMetadata(imports = 4, importsLoaded = 3)
         ).deletionImpact()
@@ -118,7 +118,7 @@ class BlocklistDeletionTest {
     }
 
     @Test
-    fun `a bundle importing one list warns in the singular`() {
+    fun `A bundle importing one list warns in the singular`() {
         val impact = config(
             metadata = BlocklistMetadata(imports = 1, importsLoaded = 1)
         ).deletionImpact()
@@ -135,7 +135,7 @@ class BlocklistDeletionTest {
     }
 
     @Test
-    fun `a bundle whose imports all failed warns about nothing beyond itself`() {
+    fun `A bundle whose imports all failed warns about nothing beyond itself`() {
         assertNull(
             "Nothing loaded means nothing extra is lost, whatever the bundle declared",
             config(metadata = BlocklistMetadata(imports = 4, importsLoaded = 0)).deletionImpact()
@@ -151,7 +151,7 @@ class BlocklistDeletionTest {
      * which this project has on the instrumented source set only.
      */
     @Test
-    fun `confirming a deletion removes only the chosen list`() {
+    fun `Removes only the chosen list when a deletion is confirmed`() {
         runBlocking {
             val manager = ExternalBlocklistManager(app)
             manager.addBlocklist(config(id = "keep-me"))

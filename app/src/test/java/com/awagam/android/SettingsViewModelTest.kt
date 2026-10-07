@@ -70,11 +70,9 @@ class SettingsViewModelTest {
 
     // Helper Methods
 
-    /**
-     * Store a blocklist, then read the export the settings screen would show.
-     * The ViewModel goes through a store so clearing it cancels the collectors
-     * its `init` starts, which would otherwise outlive the test.
-     */
+    // Store a blocklist, then read the export the settings screen would show.
+    // The ViewModel goes through a store so clearing it cancels the collectors
+    // its `init` starts, which would otherwise outlive the test.
     private fun exportWith(config: ExternalBlocklistConfig): String {
         runBlocking { ExternalBlocklistManager(app).addBlocklist(config) }
 
@@ -102,7 +100,7 @@ class SettingsViewModelTest {
     // Export Tests
 
     @Test
-    fun `export states the refresh interval of a list added here`() {
+    fun `Export states the refresh interval of a list added here`() {
         val exportJson = exportWith(config(BLOCKLIST_REFRESH_INTERVAL_MS))
 
         assertTrue(
@@ -116,7 +114,7 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `export preserves the interval an imported list came with`() {
+    fun `Export preserves the interval an imported list came with`() {
         val imported = TimeUnit.HOURS.toMillis(1)
         val exportJson = exportWith(config(imported))
 

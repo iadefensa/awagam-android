@@ -21,7 +21,7 @@ import java.net.URI
 class DnsProvidersTest {
 
     @Test
-    fun `every provider host has a hardcoded address`() {
+    fun `Every provider host has a hardcoded address`() {
         val known = DnsResolver.DOH_SERVER_IPS.keys
         DnsProviders.ALL.forEach { provider ->
             val host = URI(provider.url).host
@@ -33,7 +33,7 @@ class DnsProvidersTest {
     }
 
     @Test
-    fun `every provider is reached over HTTPS`() {
+    fun `Reaches every provider over HTTPS`() {
         DnsProviders.ALL.forEach { provider ->
             assertTrue(
                 "${provider.name} is not HTTPS",
@@ -43,13 +43,13 @@ class DnsProvidersTest {
     }
 
     @Test
-    fun `provider URLs are unique`() {
+    fun `Provider URLs are unique`() {
         val urls = DnsProviders.ALL.map { it.url }
         assertEquals("Duplicate provider URLs", urls.size, urls.toSet().size)
     }
 
     @Test
-    fun `default is DNS4EU Protective`() {
+    fun `Defaults to DNS4EU Protective`() {
         assertEquals(
             "https://protective.joindns4.eu/dns-query",
             DnsProviders.DEFAULT.url
@@ -71,7 +71,7 @@ class DnsProvidersTest {
     }
 
     @Test
-    fun `providers carry a name and a description`() {
+    fun `Providers carry a name and a description`() {
         DnsProviders.ALL.forEach { provider ->
             assertTrue("Provider without a name", provider.name.isNotBlank())
             assertTrue("${provider.name} has no description", provider.description.isNotBlank())
@@ -79,7 +79,7 @@ class DnsProvidersTest {
     }
 
     @Test
-    fun `catalog covers the providers the documentation promises`() {
+    fun `Catalog covers the providers the documentation promises`() {
         val names = DnsProviders.ALL.map { it.name }
         listOf("DNS4EU", "Cloudflare", "Google", "Quad9", "OpenDNS", "AdGuard").forEach { promised ->
             assertNotNull(

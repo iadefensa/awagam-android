@@ -23,7 +23,7 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse valid blocklist JSON with string context`() {
+    fun `Parses valid blocklist JSON with string context`() {
         val jsonString = """
             {
                 "test-group": {
@@ -51,7 +51,7 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse blocklist JSON with array context`() {
+    fun `Parses blocklist JSON with array context`() {
         val jsonString = """
             {
                 "test-group": {
@@ -67,14 +67,14 @@ class BlocklistParserTest {
         val group = groups["test-group"]!!
 
         assertEquals("Test Group", group.name)
-        // Context is now JsonElement - verify it's an array
+        // Context is a JsonElement—verify it’s an array
         assertTrue(group.context is JsonArray)
         val contextArray = group.context as JsonArray
         assertEquals(2, contextArray.size)
     }
 
     @Test
-    fun `parse blocklist JSON with null context`() {
+    fun `Parses blocklist JSON with null context`() {
         val jsonString = """
             {
                 "test-group": {
@@ -95,7 +95,7 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse blocklist with missing optional fields`() {
+    fun `Parses blocklist with missing optional fields`() {
         val jsonString = """
             {
                 "minimal": {
@@ -115,7 +115,7 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse blocklist with multiple groups`() {
+    fun `Parses blocklist with multiple groups`() {
         val jsonString = """
             {
                 "group1": {
@@ -137,14 +137,14 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse empty blocklist`() {
+    fun `Parses empty blocklist`() {
         val jsonString = "{}"
         val groups: Map<String, BlocklistGroup> = json.decodeFromString(jsonString)
         assertTrue(groups.isEmpty())
     }
 
     @Test
-    fun `ignore unknown fields in JSON`() {
+    fun `Ignores unknown fields in JSON`() {
         val jsonString = """
             {
                 "test": {
@@ -164,7 +164,7 @@ class BlocklistParserTest {
     }
 
     @Test
-    fun `parse real-world blocklist format`() {
+    fun `Parses real-world blocklist format`() {
         // Mimics actual AWAGAM blocklist structure
         val jsonString = """
             {
@@ -204,7 +204,7 @@ class BlocklistParserTest {
     }
 
     @Test(expected = Exception::class)
-    fun `reject invalid JSON`() {
+    fun `Rejects invalid JSON`() {
         val invalidJson = "{ this is not valid json }"
         json.decodeFromString<Map<String, BlocklistGroup>>(invalidJson)
     }
