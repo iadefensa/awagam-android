@@ -11,7 +11,7 @@ Visit IA Defensa for [general information about this app](https://iadefensa.com/
 
 ### Requirements
 
-* Android Studio Otter 3 Feature Drop (2025.2.3) or newer
+* Android Studio that supports the project’s Android Gradle plugin version (`com.android.application` in `build.gradle.kts`; command-line builds don’t need Android Studio)
 * JDK 21
 * Android SDK 37
 
@@ -32,6 +32,28 @@ Debug builds are not minified and keep debug logging, so they don’t reflect wh
 ```
 
 Unit tests also run automatically before `assembleDebug` and `assembleRelease`.
+
+### Running on an Emulator
+
+Create a virtual device once, in Android Studio’s _Device Manager_ (or with the SDK’s `avdmanager`). The `emulator` and `adb` commands live in the SDK’s `emulator/` and `platform-tools/` directories; add both to `PATH` or prefix them with the SDK location (`$ANDROID_HOME`).
+
+Start the emulator in its own terminal and leave it running:
+
+```shell
+emulator -list-avds
+emulator -avd <name>
+```
+
+Once its home screen shows, install and launch the debug build:
+
+```shell
+./gradlew installDebug
+adb shell monkey -p com.awagam.android -c android.intent.category.LAUNCHER 1
+```
+
+`installDebug` fails with “No online devices found” while the emulator is still booting; wait and run it again. Debug and release builds share the application ID but not the signing key, so switching between them on the same device requires `adb uninstall com.awagam.android` first.
+
+To check blocking, add a blocklist under _Settings_, enable the app (granting VPN consent), and open a blocked domain in the emulator’s browser. Exports can be checked via _Settings_ by copying the export content.
 
 ### Release Build
 
@@ -147,7 +169,7 @@ com.awagam.android/
 └── worker/                  # BlocklistUpdateWorker (6h check, 24h per list), VpnWatchdogWorker (15min)
 ```
 
-Tests: `BlocklistDeletionTest`, `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsProvidersTest`, `DnsResolverTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
+Tests: `BlocklistDeletionTest`, `BlocklistExporterTest`, `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsProvidersTest`, `DnsResolverTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
 
 ## License
 

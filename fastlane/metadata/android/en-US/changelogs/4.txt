@@ -1,4 +1,4 @@
 • Fixed internationalized domains with characters like “ß” not being blocked
-• Fixed Pi-hole export, whose TLD rules Pi-hole rejected in lists and whose domain rules missed subdomain
+• Fixed Pi-hole export, whose TLD rules Pi-hole rejected in lists and whose domain rules missed subdomains
 • Fixed Pi-hole and AdGuard Home exports containing URL rules those tools can’t apply
 • Updated invalid blocklist entries and groups without a name to be skipped with a warning instead of failing the whole blocklist

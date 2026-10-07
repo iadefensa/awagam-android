@@ -16,15 +16,18 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
-// Run unit tests before assembling APK to catch regressions early, and rename output to include version
+// Run unit tests before assembling APK to catch regressions early, and copy output
+// to a versioned name (copy, not rename, since install tasks and Android Studio
+// deploy the original file)
 tasks.whenTaskAdded {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
         doLast {
             val variant = name.removePrefix("assemble").lowercase()
             val outDir = layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
-            outDir.listFiles()?.filter { it.extension == "apk" }?.forEach { file ->
-                file.renameTo(File(outDir, "awagam-${android.defaultConfig.versionName}.apk"))
+            val versioned = File(outDir, "awagam-${android.defaultConfig.versionName}.apk")
+            outDir.listFiles()?.filter { it.extension == "apk" && it != versioned }?.forEach { file ->
+                file.copyTo(versioned, overwrite = true)
             }
         }
     }
