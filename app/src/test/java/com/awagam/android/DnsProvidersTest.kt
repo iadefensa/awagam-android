@@ -7,6 +7,7 @@ import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.dns.DnsResolver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.URI
@@ -87,5 +88,65 @@ class DnsProvidersTest {
                 names.find { it.startsWith(promised) }
             )
         }
+    }
+
+    @Test
+    fun `localResolver addresses the given port on IPv4 loopback`() {
+        assertEquals("udp://127.0.0.1:5354", DnsProviders.localResolver(5354).url)
+    }
+
+    @Test
+    fun `localResolver defaults to InviZible’s DNSCrypt port`() {
+        assertEquals(5354, DnsProviders.LOCAL_RESOLVER_DEFAULT_PORT)
+    }
+
+    @Test
+    fun `localResolverPort reads the port of a local resolver URL`() {
+        assertEquals(5400, DnsProviders.localResolverPort("udp://127.0.0.1:5400"))
+    }
+
+    @Test
+    fun `localResolverPort rejects hosts other than loopback`() {
+        // Plain DNS leaving the device would undo what DoH protects
+        listOf(
+            "udp://192.168.1.1:53",
+            "udp://9.9.9.9:53",
+            "udp://localhost:5354"
+        ).forEach { url ->
+            assertNull(url, DnsProviders.localResolverPort(url))
+        }
+    }
+
+    @Test
+    fun `localResolverPort rejects ports out of range`() {
+        listOf(
+            "udp://127.0.0.1:0",
+            "udp://127.0.0.1:65536",
+            "udp://127.0.0.1:",
+            "udp://127.0.0.1",
+            "udp://127.0.0.1:53x"
+        ).forEach { url ->
+            assertNull(url, DnsProviders.localResolverPort(url))
+        }
+    }
+
+    @Test
+    fun `localResolverPort ignores DoH providers`() {
+        DnsProviders.ALL.forEach { provider ->
+            assertNull(provider.name, DnsProviders.localResolverPort(provider.url))
+        }
+    }
+
+    @Test
+    fun `forUrl resolves a local resolver URL`() {
+        assertEquals(
+            DnsProviders.localResolver(5400),
+            DnsProviders.forUrl("udp://127.0.0.1:5400")
+        )
+    }
+
+    @Test
+    fun `forUrl falls back to the default for a non-loopback resolver URL`() {
+        assertEquals(DnsProviders.DEFAULT, DnsProviders.forUrl("udp://9.9.9.9:53"))
     }
 }

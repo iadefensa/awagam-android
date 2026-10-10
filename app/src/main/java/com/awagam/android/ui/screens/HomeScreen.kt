@@ -329,6 +329,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     VpnErrorCard(
                         error = vpnError,
+                        usesLocalResolver = uiState.usesLocalResolver,
                         onDismiss = { viewModel.clearVpnError() }
                     )
                 }
@@ -745,6 +746,7 @@ private fun StatCard(
 @Composable
 private fun VpnErrorCard(
     error: String,
+    usesLocalResolver: Boolean,
     onDismiss: () -> Unit
 ) {
     val isDoHError = error.startsWith(UserPreferences.VPN_ERROR_DOH_FAILED)
@@ -757,12 +759,20 @@ private fun VpnErrorCard(
             "Protection did not start in time. Another VPN may be holding the connection, or the blocklists may be too large to load. Try again."
         isDoHError -> {
             val detail = error.removePrefix("${UserPreferences.VPN_ERROR_DOH_FAILED}:")
-            "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection, or pick a different DNS provider in the settings."
+            if (usesLocalResolver) {
+                "The local resolver is not responding ($detail). DNS queries will fail until it does. Make sure the app providing it is running (for InviZible Pro, with DNSCrypt started in proxy mode) and that the port in the settings matches, or pick a different DNS provider."
+            } else {
+                "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection, or pick a different DNS provider in the settings."
+            }
         }
         else ->
             "Could not start protection. Please try again."
     }
-    val title = if (isDoHError) "DNS Upstream Unreachable" else "Protection Failed to Start"
+    val title = when {
+        !isDoHError -> "Protection Failed to Start"
+        usesLocalResolver -> "Local Resolver Not Responding"
+        else -> "DNS Upstream Unreachable"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),

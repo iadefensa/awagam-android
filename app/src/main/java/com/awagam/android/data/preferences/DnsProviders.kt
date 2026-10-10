@@ -4,7 +4,7 @@
 package com.awagam.android.data.preferences
 
 /**
- * An upstream DNS-over-HTTPS resolver the user can select.
+ * An upstream resolver the user can select: DNS-over-HTTPS, or a local resolver.
  * The host of every `url` must appear in `DnsResolver.DOH_SERVER_IPS`: without a
  * hardcoded address, resolving it would fall back to system DNS, which the
  * tunnel intercepts—the query would be answered by the resolver it is trying to
@@ -17,7 +17,8 @@ data class DnsProvider(
 )
 
 /**
- * The resolvers offered under Settings, in display order.
+ * The DoH resolvers offered under Settings, in display order, plus the local
+ * resolver offered after them.
  */
 object DnsProviders {
 
@@ -82,8 +83,40 @@ object DnsProviders {
 
     /**
      * The provider a stored URL belongs to, falling back to the default.
-     * Only the selection UI writes this preference, and only values from `ALL`,
-     * so the fallback covers a downgrade that shipped a provider since removed.
+     * Only the selection UI writes this preference, and only values from `ALL` or
+     * `localResolver`, so the fallback covers a downgrade that shipped a provider
+     * since removed.
      */
-    fun forUrl(url: String): DnsProvider = ALL.find { it.url == url } ?: DEFAULT
+    fun forUrl(url: String): DnsProvider =
+        ALL.find { it.url == url }
+            ?: localResolverPort(url)?.let { localResolver(it) }
+            ?: DEFAULT
+
+    /**
+     * InviZible Pro’s DNSCrypt port in proxy mode, the setup local resolvers are
+     * most often asked for.
+     */
+    const val LOCAL_RESOLVER_DEFAULT_PORT = 5354
+
+    private const val LOCAL_RESOLVER_PREFIX = "udp://127.0.0.1:"
+
+    /**
+     * A resolver running on this device, like InviZible’s DNSCrypt, reached with
+     * plain DNS over UDP. Limited to loopback: Plain DNS leaving the device would
+     * be readable on the network, which is what DoH is chosen to prevent.
+     */
+    fun localResolver(port: Int): DnsProvider = DnsProvider(
+        name = "Local resolver",
+        description = "A DNS resolver on this device, on port $port (like InviZible’s DNSCrypt)",
+        url = "$LOCAL_RESOLVER_PREFIX$port"
+    )
+
+    /**
+     * The port of a local resolver URL, or null for anything else.
+     */
+    fun localResolverPort(url: String): Int? =
+        url.removePrefix(LOCAL_RESOLVER_PREFIX)
+            .takeIf { it != url && it.all(Char::isDigit) }
+            ?.toIntOrNull()
+            ?.takeIf { it in 1..65535 }
 }

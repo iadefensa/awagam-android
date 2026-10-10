@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -71,6 +72,7 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
@@ -110,6 +112,8 @@ fun SettingsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
     var showDnsProviderDialog by remember { mutableStateOf(false) }
+    // The port the local resolver dialog opens with; null while it is closed
+    var localResolverPort by remember { mutableStateOf<Int?>(null) }
     // Remembered so the export dialog can share the same format it is showing
     var exportFormat by remember { mutableStateOf<BlocklistExporter.Format?>(null) }
     var editingBlocklist by remember { mutableStateOf<ExternalBlocklistConfig?>(null) }
@@ -369,7 +373,8 @@ fun SettingsScreen(
                 SectionHeader(
                     title = "DNS Provider",
                     description = "Where queries go that blocklists don’t block. " +
-                        "Sent over DNS-over-HTTPS, so the network in between can’t read them."
+                        "Providers are reached over DNS-over-HTTPS, so the network in between can’t read them; " +
+                        "a local resolver, like InviZible’s DNSCrypt, takes care of that itself."
                 )
             }
 
@@ -504,6 +509,21 @@ fun SettingsScreen(
             onSelect = { provider ->
                 viewModel.setUpstreamDns(provider)
                 showDnsProviderDialog = false
+            },
+            onSelectLocal = { port ->
+                showDnsProviderDialog = false
+                localResolverPort = port
+            }
+        )
+    }
+
+    localResolverPort?.let { port ->
+        LocalResolverDialog(
+            initialPort = port,
+            onDismiss = { localResolverPort = null },
+            onConfirm = { confirmedPort ->
+                viewModel.setUpstreamDns(DnsProviders.localResolver(confirmedPort))
+                localResolverPort = null
             }
         )
     }
@@ -901,19 +921,24 @@ private fun ImportExportDialog(
 }
 
 // Pick the upstream resolver. Scrollable because the list outgrows a dialog on
-// smaller screens, and selecting closes it—there is nothing to confirm.
+// smaller screens, and selecting closes it—there is nothing to confirm, except
+// for the local resolver, whose port `onSelectLocal` asks for.
 @Composable
 private fun DnsProviderDialog(
     selected: DnsProvider,
     onDismiss: () -> Unit,
-    onSelect: (DnsProvider) -> Unit
+    onSelect: (DnsProvider) -> Unit,
+    onSelectLocal: (Int) -> Unit
 ) {
+    // The selected local resolver keeps its port; otherwise the default is offered
+    val local = selected.takeIf { DnsProviders.localResolverPort(it.url) != null }
+        ?: DnsProviders.localResolver(DnsProviders.LOCAL_RESOLVER_DEFAULT_PORT)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("DNS Provider") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                DnsProviders.ALL.forEach { provider ->
+                (DnsProviders.ALL + local).forEach { provider ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -922,7 +947,10 @@ private fun DnsProviderDialog(
                             .selectable(
                                 selected = provider == selected,
                                 role = Role.RadioButton,
-                                onClick = { onSelect(provider) }
+                                onClick = {
+                                    DnsProviders.localResolverPort(provider.url)?.let(onSelectLocal)
+                                        ?: onSelect(provider)
+                                }
                             )
                             .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -949,6 +977,55 @@ private fun DnsProviderDialog(
             }
         },
         confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun LocalResolverDialog(
+    initialPort: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var port by remember { mutableStateOf(initialPort.toString()) }
+    val validPort = port.toIntOrNull()?.takeIf { it in 1..65535 }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Local Resolver") },
+        text = {
+            Column {
+                Text(
+                    text = "Forward queries to a DNS resolver running on this device, like InviZible Pro’s DNSCrypt in proxy mode (port 5354). " +
+                        "Queries reach it unencrypted, without leaving the device; how it sends them on is up to the resolver. " +
+                        "While it isn’t running, DNS lookups fail.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit).take(5) },
+                    label = { Text("Port on 127.0.0.1") },
+                    singleLine = true,
+                    isError = validPort == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { validPort?.let(onConfirm) },
+                enabled = validPort != null
+            ) {
+                Text("Use")
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
