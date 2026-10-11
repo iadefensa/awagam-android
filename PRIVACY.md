@@ -44,6 +44,7 @@ The app makes two types of network requests:
    - Quad9: `dns.quad9.net`
    - OpenDNS: `doh.opendns.com`
    - AdGuard: `dns.adguard.com`
+   - Local resolver: a resolver running on your device (`127.0.0.1`), like InviZible Pro’s DNSCrypt
 
 2. **Blocklist fetches:** HTTPS requests to URLs you configure
 
@@ -60,7 +61,7 @@ No other network connections are made. No analytics, telemetry, or tracking.
 
 ## Third-Party Services
 
-The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution. Their privacy policies apply to DNS queries:
+The app uses DNS-over-HTTPS (DoH) providers for upstream DNS resolution, unless you select a local resolver. Their privacy policies apply to DNS queries:
 
 * DNS4EU: https://joindns4.eu/privacy-policy
 * Cloudflare: https://www.cloudflare.com/privacypolicy/

@@ -329,6 +329,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     VpnErrorCard(
                         error = vpnError,
+                        usesLocalResolver = uiState.usesLocalResolver,
                         onDismiss = { viewModel.clearVpnError() }
                     )
                 }
@@ -490,7 +491,8 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "AWAGAM creates a local VPN to intercept DNS queries. Blocked domains resolve to 0.0.0.0, preventing connections. Your actual Internet traffic is not routed through the VPN—only DNS lookups are filtered.\n\n" +
-                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add.",
+                                "Nothing is sent to IA Defensa, and there is no analytics or tracking. The only external connections are the ones filtering needs: Queries that blocklists don’t block go to the DNS provider you select, encrypted over DNS-over-HTTPS, and blocklists are fetched from the URLs you add. " +
+                                "With a local resolver selected, queries go unencrypted to that app on this device (127.0.0.1), and how they leave the device is up to the app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -745,6 +747,7 @@ private fun StatCard(
 @Composable
 private fun VpnErrorCard(
     error: String,
+    usesLocalResolver: Boolean,
     onDismiss: () -> Unit
 ) {
     val isDoHError = error.startsWith(UserPreferences.VPN_ERROR_DOH_FAILED)
@@ -757,12 +760,20 @@ private fun VpnErrorCard(
             "Protection did not start in time. Another VPN may be holding the connection, or the blocklists may be too large to load. Try again."
         isDoHError -> {
             val detail = error.removePrefix("${UserPreferences.VPN_ERROR_DOH_FAILED}:")
-            "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection, or pick a different DNS provider in the settings."
+            if (usesLocalResolver) {
+                "The local resolver is not responding ($detail). DNS queries will fail until it does. Make sure the app providing it is running (for InviZible Pro, with DNSCrypt started in proxy mode) and that the port in the settings matches, or pick a different DNS provider."
+            } else {
+                "DNS upstream is not reachable ($detail). DNS queries will fail. Check your Internet connection, or pick a different DNS provider in the settings."
+            }
         }
         else ->
             "Could not start protection. Please try again."
     }
-    val title = if (isDoHError) "DNS Upstream Unreachable" else "Protection Failed to Start"
+    val title = when {
+        !isDoHError -> "Protection Failed to Start"
+        usesLocalResolver -> "Local Resolver Not Responding"
+        else -> "DNS Upstream Unreachable"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),

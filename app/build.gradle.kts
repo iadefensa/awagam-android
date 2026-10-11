@@ -18,12 +18,15 @@ if (keystorePropertiesFile.exists()) {
 
 // Run unit tests before assembling APK to catch regressions early, and copy output
 // to a versioned name (copy, not rename, since install tasks and Android Studio
-// deploy the original file)
+// deploy the original file). The copy hangs off packaging, which install tasks
+// run too, so it can’t lag behind the APK they rebuild.
 tasks.whenTaskAdded {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
+    }
+    if (name == "packageDebug" || name == "packageRelease") {
         doLast {
-            val variant = name.removePrefix("assemble").lowercase()
+            val variant = name.removePrefix("package").lowercase()
             val outDir = layout.buildDirectory.dir("outputs/apk/$variant").get().asFile
             val versioned = File(outDir, "awagam-${android.defaultConfig.versionName}.apk")
             outDir.listFiles()?.filter { it.extension == "apk" && it != versioned }?.forEach { file ->
@@ -41,8 +44,8 @@ android {
         applicationId = "com.awagam.android"
         minSdk = 28
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.2"
+        versionCode = 5
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -1,13 +1,13 @@
 AWAGAM blocks access to top-level domains and domains at the DNS level, using blocklists you configure yourself.
 
-It runs a local VPN that intercepts DNS queries. Blocked lookups resolve to 0.0.0.0; everything else is forwarded to the DNS-over-HTTPS resolver of your choice. Your ordinary Internet traffic is never routed through the VPN.
+It runs a local VPN that intercepts DNS queries. Blocked lookups resolve to 0.0.0.0; everything else is forwarded to the DNS-over-HTTPS resolver of your choice, or to a local resolver like InviZible Pro’s DNSCrypt. Your ordinary Internet traffic is never routed through the VPN.
 
 The app ships with no blocking rules of its own. What gets blocked is entirely up to you.
 
 Features:
 
 * Block TLDs and domains at the DNS level
-* DNS-over-HTTPS upstream (DNS4EU, Cloudflare, Google, Quad9, OpenDNS, AdGuard)
+* DNS-over-HTTPS upstream (DNS4EU, Cloudflare, Google, Quad9, OpenDNS, AdGuard), or a local resolver on the device
 * Add, edit, and manage as many blocklist URLs as you like
 * Compatible with the AWAGAM browser extension blocklist format, including bundles
 * Temporarily disable protection (5 minutes, 15 minutes, 1 hour) with automatic restart

@@ -23,12 +23,14 @@ import org.xbill.DNS.Rcode
 import org.xbill.DNS.Record
 import org.xbill.DNS.Section
 import org.xbill.DNS.Type
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 /**
- * DNS resolver that filters queries against the blocklist
- * and forwards allowed queries to an upstream DoH server.
+ * DNS resolver that filters queries against the blocklist and forwards
+ * allowed queries to an upstream DoH server or local resolver.
  */
 class DnsResolver(private val blocklistRepository: BlocklistRepository) {
 
@@ -43,6 +45,10 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         // Blocked response: 0.0.0.0 for A records, :: for AAAA records
         private val BLOCKED_IPV4 = InetAddress.getByName("0.0.0.0")
         private val BLOCKED_IPV6 = InetAddress.getByName("::")
+
+        // A literal, so no lookup; `getLoopbackAddress()` may return `::1`
+        private val LOCAL_RESOLVER_ADDRESS = InetAddress.getByName("127.0.0.1")
+        private const val LOCAL_RESOLVER_TIMEOUT_MS = 5000
 
         /**
          * Hardcoded IPs for DoH servers, avoiding a chicken-and-egg problem: When
@@ -340,7 +346,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     }
 
     /**
-     * Test DoH connectivity by sending a query for example.com.
+     * Test upstream connectivity by sending a query for example.com.
      * Returns null on success, or an error description on failure.
      * `url` defaults to the current upstream, but a probe that spans retries
      * passes the one it started against, so its verdict covers a single resolver.
@@ -356,6 +362,16 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
             query.header.setFlag(Flags.RD.toInt())
 
             val dnsPayload = query.toWire()
+            DnsProviders.localResolverPort(url)?.let { port ->
+                // Any datagram would do as proof of life, but only a DNS answer to
+                // this query shows a resolver is listening on the port
+                val reply = Message(queryLocalResolver(port, dnsPayload))
+                if (!reply.header.getFlag(Flags.QR.toInt()) || reply.question != query.question) {
+                    return "No DNS answer on port $port"
+                }
+                Log.d(TAG, "Local resolver connectivity test passed")
+                return null
+            }
             val request = Request.Builder()
                 .url(url)
                 .post(dnsPayload.toRequestBody(DOH_CONTENT_TYPE.toMediaType()))
@@ -371,7 +387,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "DoH connectivity test failed", e)
+            Log.e(TAG, "Upstream connectivity test failed", e)
             e.message ?: e.javaClass.simpleName
         }
     }
@@ -471,18 +487,20 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                 } else {
                     Log.d(TAG, "Cache miss: $hostname")
                     statisticsManager?.recordCacheMiss()
-                    // Forward to upstream DoH server, noting which resolver the
-                    // query is going out to
+                    // Forward upstream, noting which resolver the query is going
+                    // out to
                     val generation = resolverGeneration
                     val upstreamResponse = forwardToUpstream(dnsPayload)?.let {
                         acceptUpstreamResponse(query, it, generation)
                     }
                     if (upstreamResponse != null) {
+                        // Only an answer that passed validation counts as success
+                        onUpstreamSuccess?.invoke()
                         upstreamResponse
                     } else {
                         // Return SERVFAIL so the client gets a proper DNS error
                         // instead of timing out with no response
-                        Log.w(TAG, "DoH failed, returning SERVFAIL")
+                        Log.w(TAG, "Upstream failed, returning SERVFAIL")
                         createServfailResponse(query)
                     }
                 }
@@ -608,8 +626,46 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     var onUpstreamSuccess: (() -> Unit)? = null
 
     private fun forwardToUpstream(dnsPayload: ByteArray): ByteArray? {
+        val url = upstreamDnsUrl
+        val port = DnsProviders.localResolverPort(url)
+        return if (port != null) {
+            forwardToLocalResolver(port, dnsPayload)
+        } else {
+            forwardToDoh(url, dnsPayload)
+        }
+    }
+
+    private fun forwardToLocalResolver(port: Int, dnsPayload: ByteArray): ByteArray? {
+        return try {
+            queryLocalResolver(port, dnsPayload).takeIf { it.isNotEmpty() }
+                ?: run {
+                    Log.w(TAG, "Local resolver returned an empty response")
+                    null
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Local resolver request error", e)
+            null
+        }
+    }
+
+    // Plain DNS over UDP to a resolver on this device. Needs no protection from the
+    // tunnel, which routes only its own DNS address, not loopback.
+    private fun queryLocalResolver(port: Int, dnsPayload: ByteArray): ByteArray {
+        DatagramSocket().use { socket ->
+            socket.soTimeout = LOCAL_RESOLVER_TIMEOUT_MS
+            // Connected, so only the resolver’s answers are received
+            socket.connect(LOCAL_RESOLVER_ADDRESS, port)
+            socket.send(DatagramPacket(dnsPayload, dnsPayload.size))
+            val buffer = ByteArray(MAX_DNS_RESPONSE_SIZE.toInt())
+            val packet = DatagramPacket(buffer, buffer.size)
+            socket.receive(packet)
+            return buffer.copyOf(packet.length)
+        }
+    }
+
+    private fun forwardToDoh(url: String, dnsPayload: ByteArray): ByteArray? {
         val request = Request.Builder()
-            .url(upstreamDnsUrl)
+            .url(url)
             .post(dnsPayload.toRequestBody(DOH_CONTENT_TYPE.toMediaType()))
             .header("Accept", DOH_CONTENT_TYPE)
             .build()
@@ -617,7 +673,6 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    onUpstreamSuccess?.invoke()
                     // Read with a hard cap rather than `bytes()`, which would buffer
                     // however much the upstream chooses to send (chunked responses
                     // don’t announce a length up front)

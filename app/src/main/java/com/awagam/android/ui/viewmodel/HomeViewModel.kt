@@ -6,6 +6,7 @@ package com.awagam.android.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.data.blocklist.ExternalBlocklistManager
 import com.awagam.android.di.DependencyContainer
@@ -29,6 +30,8 @@ data class HomeUiState(
     val isTemporarilyDisabled: Boolean = false,
     val disableCountdownSeconds: Int = 0,
     val vpnError: String? = null,
+    // Decides how an unreachable upstream is explained
+    val usesLocalResolver: Boolean = false,
     val batteryPromptDismissed: Boolean = false
 )
 
@@ -102,6 +105,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _uiState.update {
                     it.copy(vpnError = error, isStarting = it.isStarting && !startFailed)
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            userPreferences.upstreamDnsFlow.collect { url ->
+                _uiState.update {
+                    it.copy(usesLocalResolver = DnsProviders.localResolverPort(url) != null)
                 }
             }
         }

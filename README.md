@@ -139,7 +139,7 @@ Store listing text and images live in `fastlane/metadata/android/en-US/`: `title
 
 These answers describe the app, not a particular release, so they hold until the app’s behavior changes. Restate them verbatim whenever the console asks again.
 
-**VPN (App content → VPN).** The app uses `VpnService`, and this is its core functionality. It establishes a local, on-device VPN interface for the sole purpose of intercepting DNS queries and comparing them against user-configured blocklists. Blocked lookups are answered locally with `0.0.0.0`; all others are forwarded to the user-selected DNS-over-HTTPS resolver. No other traffic is routed, inspected, proxied, or sent to any server operated by the developer.
+**VPN (App content → VPN).** The app uses `VpnService`, and this is its core functionality. It establishes a local, on-device VPN interface for the sole purpose of intercepting DNS queries and comparing them against user-configured blocklists. Blocked lookups are answered locally with `0.0.0.0`; all others are forwarded to the user-selected DNS-over-HTTPS resolver, or to a local resolver on the device the user selected instead. No other traffic is routed, inspected, proxied, or sent to any server operated by the developer.
 
 **`specialUse` foreground service justification.** DNS filtering must keep running while the user is in other apps, so the `VpnService` runs in the foreground. Android defines no foreground service type for VPN or DNS filtering, which leaves `specialUse` as the only applicable type; the declared subtype is `DNS filtering for content blocking` (see `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` in `app/src/main/AndroidManifest.xml`). The service runs only while the user has protection enabled, and stops when they disable it.
 
@@ -158,7 +158,7 @@ com.awagam.android/
 ├── data/blocklist/          # BlocklistRepository, DomainMatcher, Exporter, Models, Validator, ExternalBlocklistManager
 ├── data/preferences/        # UserPreferences (DataStore), DnsProviders (upstream catalog)
 ├── di/                      # DependencyContainer
-├── dns/                     # DnsCache (LRU+TTL), DnsResolver (DoH)
+├── dns/                     # DnsCache (LRU+TTL), DnsResolver (DoH, local resolver)
 ├── receiver/                # BootReceiver
 ├── statistics/              # StatisticsManager
 ├── ui/screens/              # Home, Settings, Statistics

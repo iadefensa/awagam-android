@@ -1,0 +1,1 @@
+• Added a local resolver option to forward DNS queries to a resolver running on the device, like InviZible Pro’s DNSCrypt in proxy mode

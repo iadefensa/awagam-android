@@ -7,6 +7,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
+import com.awagam.android.data.preferences.DnsProviders
 import com.awagam.android.data.preferences.UserPreferences
 import com.awagam.android.di.DependencyContainer
 import com.awagam.android.ui.viewmodel.HomeViewModel
@@ -59,6 +60,7 @@ class HomeViewModelTest {
             userPreferences.setEnabled(false)
             userPreferences.clearTemporaryDisable()
             userPreferences.clearVpnError()
+            userPreferences.setUpstreamDns(DnsProviders.DEFAULT.url)
         }
         viewModel = ViewModelProvider(
             viewModelStore,
@@ -215,4 +217,15 @@ class HomeViewModelTest {
     // clock advanced, and doing that here wakes the countdown loops of ViewModels
     // earlier tests left running, which hangs the whole class. Testing it would
     // mean making the timeout injectable.
+
+    @Test
+    fun `Tells a local resolver upstream from a DoH one`() {
+        runBlocking { userPreferences.setUpstreamDns(DnsProviders.localResolver(5354).url) }
+        waitForIo()
+        assertTrue(viewModel.uiState.value.usesLocalResolver)
+
+        runBlocking { userPreferences.setUpstreamDns(DnsProviders.DEFAULT.url) }
+        waitForIo()
+        assertFalse(viewModel.uiState.value.usesLocalResolver)
+    }
 }
