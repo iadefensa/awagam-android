@@ -189,18 +189,18 @@ class DnsResolverTest {
         assertEquals(1, cacheSize())
     }
 
-    // A resolver on loopback that answers one query with an A record, or swallows
-    // it when `reply` is false
-    private fun startLocalResolver(reply: Boolean = true): DatagramSocket {
+    // A resolver on loopback that answers one query with what `reply` makes of it,
+    // an A record by default, or swallows it when that is null
+    private fun startLocalResolver(
+        reply: (Message) -> ByteArray? = { response(id = it.header.id).toWire() }
+    ): DatagramSocket {
         val socket = DatagramSocket(0, InetAddress.getByName("127.0.0.1"))
         thread(isDaemon = true) {
             val buffer = ByteArray(512)
             val packet = DatagramPacket(buffer, buffer.size)
             try {
                 socket.receive(packet)
-                if (!reply) return@thread
-                val received = Message(buffer.copyOf(packet.length))
-                val answer = response(id = received.header.id).toWire()
+                val answer = reply(Message(buffer.copyOf(packet.length))) ?: return@thread
                 socket.send(DatagramPacket(answer, answer.size, packet.socketAddress))
             } catch (e: Exception) {
                 // Closed by the test
@@ -261,8 +261,52 @@ class DnsResolverTest {
 
     @Test
     fun `Finds a silent local resolver unreachable`() {
-        startLocalResolver(reply = false).use { server ->
+        startLocalResolver(reply = { null }).use { server ->
             assertNotNull(resolver.testUpstreamConnectivity(DnsProviders.localResolver(server.localPort).url))
+        }
+    }
+
+    @Test
+    fun `Finds a local resolver unreachable when it echoes the query`() {
+        // Something on the port that isn’t a resolver, answering with what it got
+        startLocalResolver(reply = { it.toWire() }).use { server ->
+            assertNotNull(resolver.testUpstreamConnectivity(DnsProviders.localResolver(server.localPort).url))
+        }
+    }
+
+    @Test
+    fun `Finds a local resolver unreachable when it answers another question`() {
+        val other = Name.fromString("other.example.")
+        startLocalResolver(reply = { response(id = it.header.id, questionName = other).toWire() }).use { server ->
+            assertNotNull(resolver.testUpstreamConnectivity(DnsProviders.localResolver(server.localPort).url))
+        }
+    }
+
+    @Test
+    fun `Reports upstream success for a valid answer`() {
+        var successes = 0
+        resolver.onUpstreamSuccess = { successes++ }
+        startLocalResolver().use { server ->
+            resolver.switchUpstreamDns(DnsProviders.localResolver(server.localPort).url)
+            val packet = queryPacket(query())
+
+            runBlocking { resolver.resolve(packet, packet.size) }
+
+            assertEquals(1, successes)
+        }
+    }
+
+    @Test
+    fun `Reports no upstream success for an invalid answer`() {
+        var successes = 0
+        resolver.onUpstreamSuccess = { successes++ }
+        startLocalResolver(reply = { it.toWire() }).use { server ->
+            resolver.switchUpstreamDns(DnsProviders.localResolver(server.localPort).url)
+            val packet = queryPacket(query())
+
+            runBlocking { resolver.resolve(packet, packet.size) }
+
+            assertEquals(0, successes)
         }
     }
 }

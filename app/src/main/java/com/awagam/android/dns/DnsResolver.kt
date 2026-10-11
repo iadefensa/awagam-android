@@ -363,7 +363,12 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
 
             val dnsPayload = query.toWire()
             DnsProviders.localResolverPort(url)?.let { port ->
-                queryLocalResolver(port, dnsPayload)
+                // Any datagram would do as proof of life, but only a DNS answer to
+                // this query shows a resolver is listening on the port
+                val reply = Message(queryLocalResolver(port, dnsPayload))
+                if (!reply.header.getFlag(Flags.QR.toInt()) || reply.question != query.question) {
+                    return "No DNS answer on port $port"
+                }
                 Log.d(TAG, "Local resolver connectivity test passed")
                 return null
             }
@@ -489,6 +494,8 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
                         acceptUpstreamResponse(query, it, generation)
                     }
                     if (upstreamResponse != null) {
+                        // Only an answer that passed validation counts as success
+                        onUpstreamSuccess?.invoke()
                         upstreamResponse
                     } else {
                         // Return SERVFAIL so the client gets a proper DNS error
@@ -631,7 +638,6 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
     private fun forwardToLocalResolver(port: Int, dnsPayload: ByteArray): ByteArray? {
         return try {
             queryLocalResolver(port, dnsPayload).takeIf { it.isNotEmpty() }
-                ?.also { onUpstreamSuccess?.invoke() }
                 ?: run {
                     Log.w(TAG, "Local resolver returned an empty response")
                     null
@@ -667,7 +673,6 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return try {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    onUpstreamSuccess?.invoke()
                     // Read with a hard cap rather than `bytes()`, which would buffer
                     // however much the upstream chooses to send (chunked responses
                     // don’t announce a length up front)
