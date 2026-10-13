@@ -529,6 +529,10 @@ object BlocklistValidator {
         if (url.isBlank()) return false
         if (url.contains(Regex("\\s"))) return false // No whitespace
 
+        // Host labels mixing “*” with Unicode can’t be punycoded, so AWAGAM Chromium rejects them
+        val host = url.replace(Regex("^https?://", RegexOption.IGNORE_CASE), "").split(Regex("[/?#:]"))[0]
+        if (host.split(".").any { label -> label.contains('*') && label.any { it.code > 0x7f } }) return false
+
         return try {
             // Try parsing as full URL first
             if (url.startsWith("http://") || url.startsWith("https://")) {

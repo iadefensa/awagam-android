@@ -21,7 +21,7 @@ Visit IA Defensa for [general information about this app](https://iadefensa.com/
 ./gradlew assembleDebug
 ```
 
-Output: `app/build/outputs/apk/debug/awagam-debug.apk`, plus a versioned copy, `awagam-<version>.apk`
+Output: app/build/outputs/apk/debug/awagam-debug.apk, plus a versioned copy, awagam-<version>.apk
 
 Debug builds are not minified and keep debug logging, so they don’t reflect what ships. Verify behavior against a release build before distributing.
 
@@ -33,9 +33,11 @@ Debug builds are not minified and keep debug logging, so they don’t reflect wh
 
 Unit tests also run automatically before `assembleDebug` and `assembleRelease`.
 
+app/src/test/resources/entry-cases.json holds entry validation cases shared with [AWAGAM Chromium](https://github.com/iadefensa/awagam-chromium), which owns them (test/fixtures/entry-cases.json there): Copy changes over from there. `EntryCasesTest` flags any drift when AWAGAM Chromium is checked out next to this repo (or at `AWAGAM_CHROMIUM_DIR`).
+
 ### Running on an Emulator
 
-Create a virtual device once, in Android Studio’s _Device Manager_ (or with the SDK’s `avdmanager`). The `emulator` and `adb` commands live in the SDK’s `emulator/` and `platform-tools/` directories; add both to `PATH` or prefix them with the SDK location (`$ANDROID_HOME`).
+Create a virtual device once, in Android Studio’s _Device Manager_ (or with the SDK’s `avdmanager`). The `emulator` and `adb` commands live in the SDK’s emulator/ and platform-tools/ directories; add both to `PATH` or prefix them with the SDK location (`$ANDROID_HOME`).
 
 Start the emulator in its own terminal and leave it running:
 
@@ -83,10 +85,10 @@ Build the release:
 ```
 
 Output:
-* APK: `app/build/outputs/apk/release/awagam-release.apk`, plus a versioned copy, `awagam-<version>.apk`
-* AAB: `app/build/outputs/bundle/release/awagam-release.aab`
+* APK: app/build/outputs/apk/release/awagam-release.apk, plus a versioned copy, awagam-<version>.apk
+* AAB: app/build/outputs/bundle/release/awagam-release.aab
 
-Each release after the first needs `versionCode` incremented in `app/build.gradle.kts`; Android refuses to install a build whose `versionCode` is not higher than the installed one. That `versionCode` also needs an entry under `Builds` in `fdroid/metadata/com.awagam.android.yml`; without one, `fdroid update` leaves the release notes out of the index current F-Droid clients read.
+Each release after the first needs `versionCode` incremented in app/build.gradle.kts; Android refuses to install a build whose `versionCode` is not higher than the installed one. That `versionCode` also needs an entry under `Builds` in fdroid/metadata/com.awagam.android.yml; without one, `fdroid update` leaves the release notes out of the index current F-Droid clients read.
 
 ### Running on a Device
 
@@ -106,8 +108,8 @@ AWAGAM is distributed directly and through F-Droid; the Play Store is deferred, 
 | --- | --- |
 | **Direct** | https://github.com/iadefensa/awagam-android/releases/latest/download/awagam.apk, a version-independent link to the newest release |
 | **Own F-Droid repository** | https://iadefensa.github.io/awagam-android/fdroid/repo, which also delivers updates |
-| **F-Droid** | https://f-droid.org/packages/com.awagam.android/ (with listing metadata in `fastlane/`) |
-| **Play Store** | Deferred; upload the `.aab` file |
+| **F-Droid** | https://f-droid.org/packages/com.awagam.android/ (with listing metadata in fastlane/) |
+| **Play Store** | Deferred; upload the .aab file |
 
 Every channel but the Play Store serves the same signed APK, so installations from any of them update interchangeably. It carries this certificate:
 
@@ -125,15 +127,15 @@ F-Droid builds the app from source and verifies the result against the release p
 
 #### Releasing
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`, which checks the tag against `versionName` and the F-Droid metadata against `versionCode`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
+Pushing a `v*` tag runs .github/workflows/release.yml, which checks the tag against `versionName` and the F-Droid metadata against `versionCode`, builds and signs the APK, verifies it carries the certificate above, opens a draft GitHub release with the APK and `SHA256SUMS`, and rebuilds the F-Droid index onto the `gh-pages` branch. The release stays a draft until its notes are written and it is published by hand.
 
 F-Droid picks up new tags on its own, but its build fetches the APK from the published release to compare against, so publish the draft promptly—while it’s a draft, that download fails. F-Droid doesn’t report failures; check that a release arrived on [the listing](https://f-droid.org/packages/com.awagam.android/) within about a week, and if not, read its build log at `https://monitor.f-droid.org/builds/log/com.awagam.android/<versionCode>`.
 
-The F-Droid repository is configured under `fdroid/`. Its index is signed with a second key, separate from the app’s, held in `fdroid/keystore.p12`; passwords come from the environment, so nothing secret is committed.
+The F-Droid repository is configured under fdroid/. Its index is signed with a second key, separate from the app’s, held in fdroid/keystore.p12; passwords come from the environment, so nothing secret is committed.
 
 The build is configured for reproducibility (`org.gradle.reproducibleFileOrder`, `org.gradle.reproducibleArchiveContents`, and `dependenciesInfo` omitted from APK and bundle). Release builds also strip debug logging via ProGuard, so no DNS query data reaches logcat—see [the privacy policy](PRIVACY.md).
 
-Store listing text and images live in `fastlane/metadata/android/en-US/`: `title.txt`, `short_description.txt`, `full_description.txt`, per-`versionCode` notes under `changelogs/`, and `images/` (`icon.png` 512×512, `featureGraphic.png` 1024×500, `phoneScreenshots/`). F-Droid reads these directly; for the Play Store they are the source to copy from.
+Store listing text and images live in fastlane/metadata/android/en-US/: title.txt, short_description.txt, full_description.txt, per-`versionCode` notes under changelogs/, and images/ (icon.png 512×512, featureGraphic.png 1024×500, phoneScreenshots/). F-Droid reads these directly; for the Play Store they are the source to copy from.
 
 #### Play Console Declarations
 
@@ -141,7 +143,7 @@ These answers describe the app, not a particular release, so they hold until the
 
 **VPN (App content → VPN).** The app uses `VpnService`, and this is its core functionality. It establishes a local, on-device VPN interface for the sole purpose of intercepting DNS queries and comparing them against user-configured blocklists. Blocked lookups are answered locally with `0.0.0.0`; all others are forwarded to the user-selected DNS-over-HTTPS resolver, or to a local resolver on the device the user selected instead. No other traffic is routed, inspected, proxied, or sent to any server operated by the developer.
 
-**`specialUse` foreground service justification.** DNS filtering must keep running while the user is in other apps, so the `VpnService` runs in the foreground. Android defines no foreground service type for VPN or DNS filtering, which leaves `specialUse` as the only applicable type; the declared subtype is `DNS filtering for content blocking` (see `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` in `app/src/main/AndroidManifest.xml`). The service runs only while the user has protection enabled, and stops when they disable it.
+**`specialUse` foreground service justification.** DNS filtering must keep running while the user is in other apps, so the `VpnService` runs in the foreground. Android defines no foreground service type for VPN or DNS filtering, which leaves `specialUse` as the only applicable type; the declared subtype is `DNS filtering for content blocking` (see `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` in app/src/main/AndroidManifest.xml). The service runs only while the user has protection enabled, and stops when they disable it.
 
 **Data safety.** The app collects and shares no user data, so the form reduces to “No” on data collection and data sharing; the encryption-in-transit and data-deletion questions do not apply. Preferences, cached blocklists, and query counts stay on the device, are never transmitted, and are removed on uninstall. `android:allowBackup="false"` plus the backup and data extraction rules keep them out of Android backup and device-to-device transfer as well. There is no analytics, telemetry, crash reporting, advertising, or DNS query logging. The two outbound connection types—DNS queries to the user’s chosen resolver and blocklist fetches from URLs the user adds—are user-initiated app functionality, not collection by the developer.
 
@@ -169,7 +171,7 @@ com.awagam.android/
 └── worker/                  # BlocklistUpdateWorker (6h check, 24h per list), VpnWatchdogWorker (15min)
 ```
 
-Tests: `BlocklistDeletionTest`, `BlocklistExporterTest`, `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsProvidersTest`, `DnsResolverTest`, `DomainMatcherTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
+Tests: `BlocklistDeletionTest`, `BlocklistExporterTest`, `BlocklistParserTest`, `BlocklistRefreshIntervalTest`, `BlocklistValidatorTest`, `DnsCacheTest`, `DnsPacketTest`, `DnsProvidersTest`, `DnsResolverTest`, `DomainMatcherTest`, `EntryCasesTest`, `ExternalBlocklistManagerTest`, `HomeViewModelTest`, `NumberFormattingTest`, `SettingsViewModelTest`, `StatisticsManagerTest`
 
 ## License
 
