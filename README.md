@@ -2,7 +2,7 @@
 
 Visit IA Defensa for [general information about this app](https://iadefensa.com/solutions/awagam-android/).
 
-<!-- Really, GitHub? -->
+<!-- What’s this, GitHub -->
 <div align="center">
 	<a href="https://iadefensa.com/solutions/awagam-android/"><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/awagam-1-home.png" alt="The home screen of the AWAGAM Android app." width="30%"></a>
 </div>
