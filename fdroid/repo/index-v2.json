@@ -14,7 +14,7 @@
       }
     },
     "address": "https://iadefensa.github.io/awagam-android/fdroid/repo",
-    "timestamp": 1791746731000,
+    "timestamp": 1793360526000,
     "categories": {
       "Internet": {
         "name": {
@@ -31,14 +31,14 @@
   "packages": {
     "com.awagam.android": {
       "metadata": {
-        "added": 1791746729000,
+        "added": 1793360524000,
         "categories": [
           "Security",
           "Internet"
         ],
         "changelog": "https://github.com/iadefensa/awagam-android/blob/main/CHANGELOG.md",
         "issueTracker": "https://github.com/iadefensa/awagam-android/issues",
-        "lastUpdated": 1791746730000,
+        "lastUpdated": 1793360525000,
         "license": "GPL-3.0-or-later",
         "sourceCode": "https://github.com/iadefensa/awagam-android",
         "webSite": "https://iadefensa.com/solutions/awagam-android/",
@@ -54,28 +54,28 @@
             "en-US": [
               {
                 "name": "/com.awagam.android/en-US/phoneScreenshots/awagam-1-home.png",
-                "sha256": "7e92edffab75d67f4b8cefa0782883dc9038cbd479c332d5d4247e8b33b07a6f",
-                "size": 161743
+                "sha256": "9102e12bd9958545a8935d5dca4b6ec7d61f6c65757cfb32bae04cc990ca7fc2",
+                "size": 71998
               },
               {
                 "name": "/com.awagam.android/en-US/phoneScreenshots/awagam-2-settings.png",
-                "sha256": "f825101d04924c630c8e70fa4e451c9b25d8a42e79c44b749d50f493afbf10db",
-                "size": 205129
+                "sha256": "528f5707f869a901f20e852db5ef4aea6908ccdc9be432453dc2aa389a3842f4",
+                "size": 90632
               },
               {
                 "name": "/com.awagam.android/en-US/phoneScreenshots/awagam-3-settings-continued.png",
-                "sha256": "057b617c5cd6490da5bf074f9612033f337a3c6beaa5fb73ebf6b9000bea79eb",
-                "size": 153303
+                "sha256": "a2c42326233798d6981f15ea2450ddf710d8115b67a2a41ea19aef29bb27c8e1",
+                "size": 66291
               },
               {
                 "name": "/com.awagam.android/en-US/phoneScreenshots/awagam-4-settings-blocklist.png",
-                "sha256": "a6272e104060ae0a593d6d4c687c501807839e24173456febccaeea68d2023ed",
-                "size": 162528
+                "sha256": "ed3ba86c4524676a120c49ca39546ba916369d0f314edfc9971b86eb0f685dab",
+                "size": 75730
               },
               {
                 "name": "/com.awagam.android/en-US/phoneScreenshots/awagam-5-statistics.png",
-                "sha256": "baf61a475e1a1f15c3d832bfa61f3d8d2fdc9b28efd56cbf2ded2b2104e226cf",
-                "size": 107788
+                "sha256": "23310ca8987411ac4554ce505065d1cf6b4f4c29d767ce73e6c1cb24becda081",
+                "size": 45020
               }
             ]
           }
@@ -101,8 +101,64 @@
         "preferredSigner": "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
       },
       "versions": {
+        "7f80153a81d196ad1dc88fabfc91dc286b35904303578a915bde02112dc58706": {
+          "added": 1793360525000,
+          "file": {
+            "name": "/awagam-1.1.1.apk",
+            "sha256": "7f80153a81d196ad1dc88fabfc91dc286b35904303578a915bde02112dc58706",
+            "size": 4096700
+          },
+          "manifest": {
+            "nativecode": [
+              "arm64-v8a",
+              "armeabi-v7a",
+              "x86",
+              "x86_64"
+            ],
+            "versionName": "1.1.1",
+            "versionCode": 6,
+            "usesSdk": {
+              "minSdkVersion": 28,
+              "targetSdkVersion": 36
+            },
+            "signer": {
+              "sha256": [
+                "0597ae6f8c8ce4e5ae289e0348d1a03d5b82789300bce0bd945068099c3d5105"
+              ]
+            },
+            "usesPermission": [
+              {
+                "name": "android.permission.INTERNET"
+              },
+              {
+                "name": "android.permission.ACCESS_NETWORK_STATE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+              },
+              {
+                "name": "android.permission.POST_NOTIFICATIONS"
+              },
+              {
+                "name": "android.permission.RECEIVE_BOOT_COMPLETED"
+              },
+              {
+                "name": "android.permission.WAKE_LOCK"
+              },
+              {
+                "name": "com.awagam.android.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+              }
+            ]
+          },
+          "whatsNew": {
+            "en-US": "• Fixed URL entries whose host mixes “*” with non-ASCII characters in one label being accepted, although they can’t match\n• Fixed the statistics progress bars not showing their track\n• Fixed statistics percentages showing a trailing “,0” on devices set to a language that uses a decimal comma\n• Fixed blocklists being loaded twice when the app starts\n• Removed the statistics screen’s “Refresh” button, as statistics already update every second"
+          }
+        },
         "30af184cdbb35f9b06fae5f16b2e524f2451a2d4a1865adf4bc967e556a82b63": {
-          "added": 1791746730000,
+          "added": 1793360525000,
           "file": {
             "name": "/awagam-1.1.0.apk",
             "sha256": "30af184cdbb35f9b06fae5f16b2e524f2451a2d4a1865adf4bc967e556a82b63",
@@ -158,7 +214,7 @@
           }
         },
         "80a2bef360e83e44720f7b08f9a079b3a524864a79ba40016ce62d497b00e649": {
-          "added": 1791746729000,
+          "added": 1793360525000,
           "file": {
             "name": "/awagam-1.0.2.apk",
             "sha256": "80a2bef360e83e44720f7b08f9a079b3a524864a79ba40016ce62d497b00e649",
@@ -214,7 +270,7 @@
           }
         },
         "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e": {
-          "added": 1791746729000,
+          "added": 1793360525000,
           "file": {
             "name": "/awagam-1.0.1.apk",
             "sha256": "2fcfe61a052c10b9f193d8956b7b258db80890f0de8465f7af4d6b3afea5226e",
@@ -270,7 +326,7 @@
           }
         },
         "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d": {
-          "added": 1791746729000,
+          "added": 1793360524000,
           "file": {
             "name": "/awagam-1.0.0.apk",
             "sha256": "e291eb641b1bcdefcadb5f27b4bb56d2cdae9ead4716a1c3cccaae8de4573c2d",
