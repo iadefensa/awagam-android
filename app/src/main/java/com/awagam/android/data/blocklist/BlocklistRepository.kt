@@ -51,7 +51,7 @@ class BlocklistRepository(private val context: Context) {
         val builder = DomainMatcher.Companion.Builder()
         val urls = mutableSetOf<String>()
 
-        val sourceCount = loadExternalBlocklists(builder, urls)
+        loadExternalBlocklists(builder, urls)
 
         val loaded = builder.build()
         matcher = loaded
@@ -59,36 +59,29 @@ class BlocklistRepository(private val context: Context) {
 
         _blocklistStats.value = BlocklistStats(
             tldCount = loaded.tldCount,
-            domainCount = loaded.domainCount,
-            urlCount = blockedUrls.size,
-            sourceCount = sourceCount
+            domainCount = loaded.domainCount
         )
         Log.d(TAG, "Loaded ${loaded.tldCount} TLDs, ${loaded.domainCount} domains, ${blockedUrls.size} URLs")
     }
 
-    // Returns the number of external sources that loaded successfully
     private suspend fun loadExternalBlocklists(
         builder: DomainMatcher.Companion.Builder,
         urls: MutableSet<String>
-    ): Int {
-        var count = 0
+    ) {
         try {
             val configs = externalBlocklistManager.blocklistsFlow.first()
             configs.filter { it.enabled }.forEach { config ->
                 val cached = externalBlocklistManager.getCachedBlocklist(config.id)
                 if (cached != null && parseBlocklist(cached, builder, urls)) {
-                    count++
                     Log.d(TAG, "Loaded blocklist: ${config.name}")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load blocklists", e)
         }
-        return count
     }
 
-    // Returns true if the source parsed. An empty but valid list still counts as a
-    // source—a user’s list may legitimately be empty.
+    // Returns true if the source parsed
     private fun parseBlocklist(
         jsonString: String,
         builder: DomainMatcher.Companion.Builder,
@@ -131,5 +124,5 @@ class BlocklistRepository(private val context: Context) {
     /**
      * Get all blocked URLs, to be listed in exports.
      */
-    fun getBlockedUrls(): Set<String> = blockedUrls.toSet()
+    fun getBlockedUrls(): Set<String> = blockedUrls
 }

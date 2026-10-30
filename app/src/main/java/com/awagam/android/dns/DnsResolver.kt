@@ -465,12 +465,12 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
             Log.d(TAG, "DNS query: $hostname (type ${Type.string(queryType)})")
 
             // Record query statistics
-            statisticsManager?.recordQuery(hostname, length)
+            statisticsManager?.recordQuery(length)
 
             // Check if blocked
             val dnsResponse = if (blocklistRepository.isBlocked(hostname)) {
                 Log.d(TAG, "Blocking: $hostname")
-                statisticsManager?.recordBlockedQuery(hostname)
+                statisticsManager?.recordBlockedQuery()
                 createBlockedResponse(query, queryType)
             } else {
                 // Check cache first
@@ -710,10 +710,7 @@ class DnsResolver(private val blocklistRepository: BlocklistRepository) {
         return response.toWire()
     }
 
-    /**
-     * Get DNS cache statistics.
-     */
-    fun getCacheStats(): DnsCache.CacheStats = dnsCache.getStats()
+    internal fun cacheSize(): Int = dnsCache.size()
 
     /**
      * Clear DNS cache.

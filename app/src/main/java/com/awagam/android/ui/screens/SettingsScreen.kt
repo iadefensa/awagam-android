@@ -64,7 +64,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -107,7 +106,6 @@ fun SettingsScreen(
     BackHandler { onNavigateBack() }
 
     val uiState by viewModel.uiState.collectAsState()
-    val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var showExportFormatDialog by remember { mutableStateOf(false) }
@@ -542,13 +540,9 @@ fun SettingsScreen(
 
     // Show export content dialog when content is generated
     uiState.exportContent?.let { content ->
-        ImportExportDialog(
-            title = "Export for DNS Filtering",
-            description = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools, or share it as a file:",
-            isImport = false,
+        ExportDialog(
+            content = content,
             onDismiss = { viewModel.clearExportContent() },
-            onConfirm = { viewModel.clearExportContent() },
-            exportData = content,
             onShare = exportFormat?.let { format -> { viewModel.shareExport(format) } }
         )
     }
@@ -867,32 +861,26 @@ private fun DeleteBlocklistDialog(
 }
 
 @Composable
-private fun ImportExportDialog(
-    title: String,
-    description: String,
-    isImport: Boolean,
+private fun ExportDialog(
+    content: String,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    exportData: String?,
-    onShare: (() -> Unit)? = null
+    onShare: (() -> Unit)?
 ) {
-    var text by remember { mutableStateOf(exportData ?: "") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = { Text("Export for DNS Filtering") },
         text = {
             Column {
                 Text(
-                    text = description,
+                    text = "Copy this content to use with Pi-hole, AdGuard Home, or similar tools, or share it as a file:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { if (isImport) text = it },
-                    readOnly = !isImport,
+                    value = content,
+                    onValueChange = {},
+                    readOnly = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp),
@@ -901,8 +889,8 @@ private fun ImportExportDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(text) }) {
-                Text(if (isImport) "Import" else "Done")
+            Button(onClick = onDismiss) {
+                Text("Done")
             }
         },
         dismissButton = {

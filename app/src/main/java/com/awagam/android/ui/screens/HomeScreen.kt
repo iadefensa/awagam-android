@@ -93,7 +93,7 @@ private val STAT_VALUE_MIN_FONT_SIZE = 14.sp
 fun HomeScreen(
     onToggleVpn: (Boolean) -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToStatistics: () -> Unit = {},
+    onNavigateToStatistics: () -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()

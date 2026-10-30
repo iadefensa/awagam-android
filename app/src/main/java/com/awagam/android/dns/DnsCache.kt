@@ -29,7 +29,7 @@ class DnsCache {
     /**
      * Represents a cached DNS response with TTL tracking.
      */
-    data class CacheEntry(
+    private class CacheEntry(
         val response: ByteArray,
         val timestamp: Long,
         val ttlSeconds: Long
@@ -37,17 +37,6 @@ class DnsCache {
         fun isExpired(): Boolean {
             val ageSeconds = (System.currentTimeMillis() - timestamp) / 1000
             return ageSeconds >= ttlSeconds
-        }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-            other as CacheEntry
-            return response.contentEquals(other.response)
-        }
-
-        override fun hashCode(): Int {
-            return response.contentHashCode()
         }
     }
 
@@ -122,29 +111,5 @@ class DnsCache {
         cache.evictAll()
     }
 
-    /**
-     * Get cache statistics.
-     */
-    fun getStats(): CacheStats {
-        return CacheStats(
-            size = cache.size(),
-            maxSize = cache.maxSize(),
-            hitCount = cache.hitCount(),
-            missCount = cache.missCount(),
-            hitRate = if (cache.hitCount() + cache.missCount() > 0) {
-                cache.hitCount().toDouble() / (cache.hitCount() + cache.missCount())
-            } else 0.0
-        )
-    }
-
-    /**
-     * Cache statistics for monitoring.
-     */
-    data class CacheStats(
-        val size: Int,
-        val maxSize: Int,
-        val hitCount: Int,
-        val missCount: Int,
-        val hitRate: Double
-    )
+    fun size(): Int = cache.size()
 }

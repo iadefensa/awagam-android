@@ -82,7 +82,7 @@ class DnsResolverTest {
         return response
     }
 
-    private fun cacheSize(): Int = resolver.getCacheStats().size
+    private fun cacheSize(): Int = resolver.cacheSize()
 
     @Test
     fun `Serves and caches a matching answer`() {

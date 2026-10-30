@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 * Fixed URL entries whose host mixes “*” with non-ASCII characters in one label (like “bü*cher.de/*”) being accepted, although they can’t match—they’re now skipped as invalid, like in AWAGAM Chromium
+* Fixed the statistics progress bars not showing their track, so a low rate looked like no bar at all
+* Fixed statistics percentages showing a trailing “,0” on devices set to a language that uses a decimal comma
+* Fixed blocklists being loaded twice when the app starts
+
+### Changed
+
+* Removed the statistics screen’s “Refresh” button, as statistics already update every second
 
 ## [1.1.0] - 2026-10-11
 

@@ -233,9 +233,9 @@ object BlocklistValidator {
 
     /**
      * Validate the bundle envelope—only problems that make the file unusable
-     * as a whole are reported here; per-URL problems are handled by the
-     * callers (fatal via `validateBundleFormat`, skippable at runtime).
-     * Returns the import URLs on success.
+     * as a whole are reported here; per-URL problems are left to
+     * `[validateImportUrl]`, so a bad import can be skipped rather than fail
+     * the bundle. Returns the import URLs on success.
      */
     fun validateBundleStructure(element: JsonElement): BundleValidationResult {
         if (!isBundle(element)) {
@@ -296,36 +296,6 @@ object BlocklistValidator {
             return ImportUrlValidationResult(false, "invalid or insecure import URL")
         }
         return ImportUrlValidationResult(true, normalizedUrl = normalizedUrl)
-    }
-
-    /**
-     * Validate AWAGAM bundle format (strict—any invalid or duplicate import
-     * fails; at runtime, bundle resolution skips such imports instead).
-     * A bundle contains only the “imports” field with 1–100 unique HTTPS URLs.
-     * Pass a normalizer so the same blocklist can’t be imported twice via
-     * different URL representations (e.g., GitHub blob vs. raw).
-     */
-    fun validateBundleFormat(
-        element: JsonElement,
-        normalizeUrl: (String) -> String = { it }
-    ): BundleValidationResult {
-        val structureValidation = validateBundleStructure(element)
-        if (!structureValidation.valid) {
-            return structureValidation
-        }
-
-        val seenUrls = mutableSetOf<String>()
-        for (url in structureValidation.imports) {
-            val urlValidation = validateImportUrl(url, normalizeUrl)
-            if (!urlValidation.valid) {
-                return BundleValidationResult(false, "$url (${urlValidation.error})")
-            }
-            if (!seenUrls.add(urlValidation.normalizedUrl)) {
-                return BundleValidationResult(false, "Duplicate import URL: $url")
-            }
-        }
-
-        return BundleValidationResult(true, imports = structureValidation.imports)
     }
 
     /**

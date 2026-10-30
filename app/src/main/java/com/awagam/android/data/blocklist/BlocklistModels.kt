@@ -34,9 +34,7 @@ data class BlocklistGroup(
  */
 data class BlocklistStats(
     val tldCount: Int = 0,
-    val domainCount: Int = 0,
-    val urlCount: Int = 0,
-    val sourceCount: Int = 0
+    val domainCount: Int = 0
 )
 
 /**
