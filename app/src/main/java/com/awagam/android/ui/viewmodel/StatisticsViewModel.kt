@@ -21,10 +21,6 @@ class StatisticsViewModel(application: Application) : AndroidViewModel(applicati
 
     val statisticsFlow: Flow<StatisticsManager.Statistics> = statisticsManager.statisticsFlow
 
-    fun refreshStatistics() {
-        statisticsManager.refresh()
-    }
-
     fun formatUptime(milliseconds: Long): String {
         return statisticsManager.formatUptime(milliseconds)
     }

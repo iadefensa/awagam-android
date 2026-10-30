@@ -38,7 +38,6 @@ import java.util.UUID
 data class SettingsUiState(
     val blocklists: List<ExternalBlocklistConfig> = emptyList(),
     val exportJson: String = "[]",
-    val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
@@ -85,7 +84,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             blocklistManager.blocklistsFlow.collect { blocklists ->
                 // Create export in browser extension format
                 val export = AwagamConfigExport(
-                    version = "2.1.0",
                     exportedAt = getIsoTimestamp(),
                     externalBlocklists = blocklists.associateBy { it.id }
                 )

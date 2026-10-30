@@ -38,11 +38,7 @@ class BlocklistExporter(private val context: Context) {
         urls: Set<String>,
         format: Format
     ): Intent = withContext(Dispatchers.IO) {
-        val content = when (format) {
-            Format.PIHOLE -> generatePihole(domains, tlds, urls)
-            Format.ADGUARD -> generateAdGuard(domains, tlds, urls)
-            Format.HOSTS -> generateHosts(domains, tlds, urls)
-        }
+        val content = getExportString(domains, tlds, urls, format)
 
         val timestamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
         val filename = "awagam-blocklist-$timestamp.${format.extension}"

@@ -264,7 +264,7 @@ class AWAGAMVpnService : VpnService() {
                     Log.d(TAG, "VPN started successfully")
 
                     // Test DoH connectivity in the background and warn the user if it fails
-                    launch(Dispatchers.IO) {
+                    launch {
                         val result = dnsResolver.probeUpstream(
                             DOH_PROBE_ATTEMPTS,
                             DOH_PROBE_RETRY_DELAY_MS
@@ -478,12 +478,7 @@ class AWAGAMVpnService : VpnService() {
 
     private suspend fun processPacket(packet: ByteArray, length: Int): ByteArray? {
         if (isDnsPacket(packet, length)) {
-            return try {
-                dnsResolver.resolve(packet, length)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error resolving DNS", e)
-                null
-            }
+            return dnsResolver.resolve(packet, length)
         }
 
         // Reject DNS-over-TLS probes (TCP SYN to port 853) with a RST so that

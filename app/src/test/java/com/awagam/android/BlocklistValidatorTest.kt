@@ -154,11 +154,11 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Accepts valid bundles`() {
+    fun `validateBundleStructure accepts valid bundles`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json", "https://example.com/b.json"]}"""
         )
-        val result = BlocklistValidator.validateBundleFormat(bundle)
+        val result = BlocklistValidator.validateBundleStructure(bundle)
         assertTrue(result.valid)
         assertEquals(
             listOf("https://example.com/a.json", "https://example.com/b.json"),
@@ -167,69 +167,63 @@ class BlocklistValidatorTest {
     }
 
     @Test
-    fun `Rejects bundles with extra fields`() {
+    fun `validateBundleStructure rejects bundles with extra fields`() {
         val bundle = Json.parseToJsonElement(
             """{"imports": ["https://example.com/a.json"], "name": "Extra"}"""
         )
-        val result = BlocklistValidator.validateBundleFormat(bundle)
+        val result = BlocklistValidator.validateBundleStructure(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `Rejects empty bundles`() {
+    fun `validateBundleStructure rejects empty bundles`() {
         val bundle = Json.parseToJsonElement("""{"imports": []}""")
-        val result = BlocklistValidator.validateBundleFormat(bundle)
+        val result = BlocklistValidator.validateBundleStructure(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `Rejects bundles with insecure import URLs`() {
-        val bundle = Json.parseToJsonElement("""{"imports": ["http://example.com/a.json"]}""")
-        val result = BlocklistValidator.validateBundleFormat(bundle)
+    fun `validateBundleStructure rejects bundles with too many imports`() {
+        val urls = (1..101).joinToString(", ") { "\"https://example.com/$it.json\"" }
+        val bundle = Json.parseToJsonElement("""{"imports": [$urls]}""")
+        val result = BlocklistValidator.validateBundleStructure(bundle)
         assertFalse(result.valid)
     }
 
     @Test
-    fun `Rejects bundles with insecure import URLs even if normalization would fix them`() {
-        val bundle = Json.parseToJsonElement("""{"imports": ["http://example.com/a.json"]}""")
-        val result = BlocklistValidator.validateBundleFormat(bundle) {
+    fun `validateBundleStructure rejects bundles with non-string imports`() {
+        val bundle = Json.parseToJsonElement("""{"imports": [42]}""")
+        val result = BlocklistValidator.validateBundleStructure(bundle)
+        assertFalse(result.valid)
+    }
+
+    @Test
+    fun `validateImportUrl returns the normalized URL`() {
+        val result = BlocklistValidator.validateImportUrl("https://github.com/user/repo/blob/main/list.json") {
+            ExternalBlocklistManager.convertToRawUrl(it)
+        }
+        assertTrue(result.valid)
+        assertEquals("https://raw.githubusercontent.com/user/repo/main/list.json", result.normalizedUrl)
+    }
+
+    @Test
+    fun `validateImportUrl rejects insecure import URLs`() {
+        assertFalse(BlocklistValidator.validateImportUrl("http://example.com/a.json").valid)
+    }
+
+    @Test
+    fun `validateImportUrl rejects insecure import URLs even if normalization would fix them`() {
+        val result = BlocklistValidator.validateImportUrl("http://example.com/a.json") {
             it.replace("http://", "https://")
         }
         assertFalse(result.valid)
     }
 
     @Test
-    fun `Rejects bundles with duplicate import URLs`() {
-        val bundle = Json.parseToJsonElement(
-            """{"imports": ["https://example.com/a.json", "https://example.com/a.json"]}"""
-        )
-        val result = BlocklistValidator.validateBundleFormat(bundle)
-        assertFalse(result.valid)
-    }
-
-    @Test
-    fun `Rejects bundles with duplicate imports via different URL representations`() {
-        val bundle = Json.parseToJsonElement(
-            """{"imports": ["https://github.com/user/repo/blob/main/list.json", "https://raw.githubusercontent.com/user/repo/main/list.json"]}"""
-        )
-        val result = BlocklistValidator.validateBundleFormat(bundle) {
+    fun `validateImportUrl rejects URLs the normalizer refuses`() {
+        val result = BlocklistValidator.validateImportUrl("https://github.com/user/repo/tree/main/lists") {
             ExternalBlocklistManager.convertToRawUrl(it)
         }
-        assertFalse(result.valid)
-    }
-
-    @Test
-    fun `Rejects bundles with too many imports`() {
-        val urls = (1..101).joinToString(", ") { "\"https://example.com/$it.json\"" }
-        val bundle = Json.parseToJsonElement("""{"imports": [$urls]}""")
-        val result = BlocklistValidator.validateBundleFormat(bundle)
-        assertFalse(result.valid)
-    }
-
-    @Test
-    fun `Rejects bundles with non-string imports`() {
-        val bundle = Json.parseToJsonElement("""{"imports": [42]}""")
-        val result = BlocklistValidator.validateBundleFormat(bundle)
         assertFalse(result.valid)
     }
 

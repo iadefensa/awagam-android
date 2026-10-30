@@ -51,8 +51,7 @@ class AWAGAMApplication : Application() {
     }
 
     private fun scheduleBlocklistUpdates() {
-        // Schedule periodic blocklist updates every 6 hours
-        BlocklistUpdateWorker.schedule(this, intervalHours = 6)
+        BlocklistUpdateWorker.schedule(this)
     }
 
     private fun scheduleVpnWatchdog() {

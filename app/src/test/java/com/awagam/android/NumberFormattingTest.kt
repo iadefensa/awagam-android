@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.awagam.android.util.formatCompact
+import com.awagam.android.util.formatPercent
 import java.util.Locale
 
 /**
@@ -118,5 +119,20 @@ class NumberFormattingTest {
         Locale.setDefault(Locale.GERMANY)
         assertEquals("2K", formatCompact(2_000))
         assertEquals("1M", formatCompact(1_000_000))
+    }
+
+    @Test
+    fun `formatPercent drops a trailing zero`() {
+        assertEquals("0%", formatPercent(0f))
+        assertEquals("12.5%", formatPercent(0.125f))
+        assertEquals("50%", formatPercent(0.5f))
+        assertEquals("100%", formatPercent(1f))
+    }
+
+    @Test
+    fun `formatPercent uses a dot in a comma-decimal locale`() {
+        Locale.setDefault(Locale.GERMANY)
+        assertEquals("12.5%", formatPercent(0.125f))
+        assertEquals("50%", formatPercent(0.5f))
     }
 }

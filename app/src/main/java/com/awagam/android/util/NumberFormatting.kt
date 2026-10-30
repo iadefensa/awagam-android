@@ -48,3 +48,10 @@ fun formatCompact(value: Long): String {
     }
     return amount + UNIT_SUFFIXES[unit]
 }
+
+/**
+ * A fraction as a percentage with at most one decimal, dropping a trailing “.0”.
+ * `Locale.ROOT` for the same reason as in [formatCompact].
+ */
+fun formatPercent(fraction: Float): String =
+    "%.1f".format(Locale.ROOT, fraction * 100).removeSuffix(".0") + "%"

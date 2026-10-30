@@ -303,6 +303,17 @@ class ExternalBlocklistManagerTest {
     }
 
     @Test
+    fun `Skips duplicate imports via different URL representations`() = runTest {
+        val bundle = bundleOf(
+            "https://github.com/user/repo/blob/main/list.json",
+            "https://raw.githubusercontent.com/user/repo/main/list.json"
+        )
+        val resolved = ExternalBlocklistManager.resolveBundle(bundle, 100) { memberJson }
+        assertEquals(1, resolved.metadata.importsLoaded)
+        assertTrue(resolved.warning!!.contains("duplicate import"))
+    }
+
+    @Test
     fun `Skips oversized imports before parsing`() = runTest {
         val huge = "x".repeat(10 * 1024 * 1024 + 1)
         val bundle = bundleOf("https://a.example/huge.json", "https://a.example/ok.json")
@@ -387,7 +398,7 @@ class ExternalBlocklistManagerTest {
         assertEquals(2, resolved.metadata.importsLoaded)
         assertTrue(
             resolved.warning!!,
-            resolved.warning!!.startsWith(
+            resolved.warning.startsWith(
                 "1 of 3 imports skipped, 2 invalid entries and 1 invalid group skipped: " +
                     "https://a.example/dead.json (HTTP 404); " +
                     "https://a.example/mixed.json: Invalid domain in group \"ads\": -invalid.com; "

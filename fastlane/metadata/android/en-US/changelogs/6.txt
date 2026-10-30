@@ -1,0 +1,5 @@
+• Fixed URL entries whose host mixes “*” with non-ASCII characters in one label being accepted, although they can’t match
+• Fixed the statistics progress bars not showing their track
+• Fixed statistics percentages showing a trailing “,0” on devices set to a language that uses a decimal comma
+• Fixed blocklists being loaded twice when the app starts
+• Removed the statistics screen’s “Refresh” button, as statistics already update every second

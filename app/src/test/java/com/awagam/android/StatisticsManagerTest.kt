@@ -57,8 +57,8 @@ class StatisticsManagerTest {
         val statistics = manager()
         val before = statistics.statisticsFlow.first()
 
-        repeat(3) { statistics.recordQuery("example.com", 40) }
-        statistics.recordBlockedQuery("ads.example")
+        repeat(3) { statistics.recordQuery(40) }
+        statistics.recordBlockedQuery()
         statistics.recordCacheHit()
         statistics.recordCacheMiss()
 
@@ -76,8 +76,8 @@ class StatisticsManagerTest {
         val before = stored()
 
         val statistics = manager()
-        repeat(5) { statistics.recordQuery("example.com", 10) }
-        statistics.recordBlockedQuery("ads.example")
+        repeat(5) { statistics.recordQuery(10) }
+        statistics.recordBlockedQuery()
         statistics.flush()
 
         // A second manager reads what was written, without the in-memory deltas
@@ -93,7 +93,7 @@ class StatisticsManagerTest {
         val before = stored()
 
         val statistics = manager()
-        repeat(4) { statistics.recordQuery("example.com", 25) }
+        repeat(4) { statistics.recordQuery(25) }
         statistics.flush()
         statistics.flush()
 
@@ -131,7 +131,7 @@ class StatisticsManagerTest {
         val statistics = manager()
         val before = statistics.statisticsFlow.first()
 
-        repeat(2) { statistics.recordQuery("example.com", 10) }
+        repeat(2) { statistics.recordQuery(10) }
         statistics.resetSession()
 
         val after = statistics.statisticsFlow.first()

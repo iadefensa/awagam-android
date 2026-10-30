@@ -520,7 +520,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 Log.d(TAG, "Converted URL: ${config.url} → $fetchUrl")
             }
 
-            val body = fetchWithFallbacks(fetchUrl, config.url)
+            val body = fetchWithFallbacks(fetchUrl)
 
             // Validate size (DoS protection)
             if (!BlocklistValidator.validateSize(body)) {
@@ -543,7 +543,7 @@ class ExternalBlocklistManager(private val context: Context) {
                 // Bundles reference other blocklists instead of containing rules
                 // `resolveBundle` passes already-normalized import URLs
                 val resolved = resolveBundle(jsonElement, BlocklistValidator.utf8Size(body), deadline = deadline) { importUrl ->
-                    fetchWithFallbacks(importUrl, importUrl)
+                    fetchWithFallbacks(importUrl)
                 }
                 bodyToCache = json.encodeToString(resolved.groups)
                 // Guard the cache as well—group ID prefixes can grow the merged result past the fetched sizes
@@ -600,14 +600,12 @@ class ExternalBlocklistManager(private val context: Context) {
 
     // Fetch URL with fallbacks for GitHub URLs.
     // Tries: 1) Raw URL, 2) jsDelivr CDN, 3) GitHub API (base64 decode).
-    private fun fetchWithFallbacks(primaryUrl: String, originalUrl: String): String {
+    private fun fetchWithFallbacks(primaryUrl: String): String {
         val errors = mutableListOf<String>()
 
         // Method 1: Try primary URL first
         try {
-            val result = fetchUrl(primaryUrl)
-            if (result != null) return result
-            errors.add("Primary URL returned null")
+            return fetchUrl(primaryUrl)
         } catch (e: Exception) {
             errors.add("Primary: ${e.message}")
         }
@@ -620,9 +618,7 @@ class ExternalBlocklistManager(private val context: Context) {
                     .replace("raw.githubusercontent.com", "cdn.jsdelivr.net/gh")
                     .replaceFirst(Regex("/([^/]+)/([^/]+)/([^/]+)/(.+)"), "/$1/$2@$3/$4")
                 Log.d(TAG, "Trying jsDelivr fallback: $jsdelivrUrl")
-                val result = fetchUrl(jsdelivrUrl)
-                if (result != null) return result
-                errors.add("jsDelivr returned null")
+                return fetchUrl(jsdelivrUrl)
             } catch (e: Exception) {
                 errors.add("jsDelivr: ${e.message}")
             }
@@ -674,8 +670,8 @@ class ExternalBlocklistManager(private val context: Context) {
         }
     }
 
-    // Fetch a URL and return its body, or null if not successful
-    private fun fetchUrl(url: String): String? {
+    // Fetch a URL and return its body, throwing if not successful
+    private fun fetchUrl(url: String): String {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", "AWAGAM-Android/1.0")

@@ -123,12 +123,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Load blocklists to populate stats
-        viewModelScope.launch {
-            blocklistRepository.loadBlocklists()
-        }
-
-        // Reload blocklists when external blocklist configs change
+        // Load blocklists to populate stats, and reload them when the configs
+        // change; DataStore emits the current configs on collection
         viewModelScope.launch {
             externalBlocklistManager.blocklistsFlow.collect {
                 blocklistRepository.loadBlocklists()

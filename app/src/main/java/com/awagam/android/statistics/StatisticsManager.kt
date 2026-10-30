@@ -18,7 +18,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -89,15 +88,10 @@ class StatisticsManager(private val context: Context) {
     // In-memory counters for current session
     private val sessionQueries = AtomicLong(0)
     private val sessionBlocked = AtomicLong(0)
-    private val sessionCacheHits = AtomicLong(0)
-    private val sessionCacheMisses = AtomicLong(0)
-    private val sessionBytes = AtomicLong(0)
 
     // Non-null while a flush is scheduled; keeps recording from queuing one per query
     @Volatile
     private var flushJob: Job? = null
-
-    private val refreshTrigger = MutableStateFlow(0L)
 
     /**
      * Statistics data model for UI display.
@@ -112,18 +106,7 @@ class StatisticsManager(private val context: Context) {
         val cacheHitRate: Double,
         val blockRate: Double,
         val sessionUptime: Long,
-        val totalBytes: Long,
-        val lastUpdated: Long = System.currentTimeMillis()
-    )
-
-    /**
-     * DNS query statistics for top domains.
-     */
-    data class DomainStats(
-        val domain: String,
-        val queryCount: Int,
-        val blockedCount: Int,
-        val lastQueried: Long
+        val totalBytes: Long
     )
 
     // Paces UI updates. Recording no longer writes to disk on every query, so
@@ -140,9 +123,8 @@ class StatisticsManager(private val context: Context) {
     /** Flow of current statistics */
     val statisticsFlow: Flow<Statistics> = combine(
         context.statisticsDataStore.data,
-        refreshTrigger,
         displayTicker
-    ) { preferences, _, _ ->
+    ) { preferences, _ ->
         val storedSessionStart = preferences.counter(SESSION_START)
         val sessionUptime = if (storedSessionStart > 0L) {
             System.currentTimeMillis() - storedSessionStart
@@ -193,9 +175,8 @@ class StatisticsManager(private val context: Context) {
     /**
      * Record a DNS query.
      */
-    fun recordQuery(domain: String, bytes: Int) {
+    fun recordQuery(bytes: Int) {
         sessionQueries.incrementAndGet()
-        sessionBytes.addAndGet(bytes.toLong())
         pendingQueries.incrementAndGet()
         pendingBytes.addAndGet(bytes.toLong())
         scheduleFlush()
@@ -204,7 +185,7 @@ class StatisticsManager(private val context: Context) {
     /**
      * Record a blocked query.
      */
-    fun recordBlockedQuery(domain: String) {
+    fun recordBlockedQuery() {
         sessionBlocked.incrementAndGet()
         pendingBlocked.incrementAndGet()
         scheduleFlush()
@@ -214,7 +195,6 @@ class StatisticsManager(private val context: Context) {
      * Record a cache hit.
      */
     fun recordCacheHit() {
-        sessionCacheHits.incrementAndGet()
         pendingCacheHits.incrementAndGet()
         scheduleFlush()
     }
@@ -223,7 +203,6 @@ class StatisticsManager(private val context: Context) {
      * Record a cache miss.
      */
     fun recordCacheMiss() {
-        sessionCacheMisses.incrementAndGet()
         pendingCacheMisses.incrementAndGet()
         scheduleFlush()
     }
@@ -325,9 +304,6 @@ class StatisticsManager(private val context: Context) {
     private fun clearSessionCounters() {
         sessionQueries.set(0)
         sessionBlocked.set(0)
-        sessionCacheHits.set(0)
-        sessionCacheMisses.set(0)
-        sessionBytes.set(0)
     }
 
     /**
@@ -341,13 +317,6 @@ class StatisticsManager(private val context: Context) {
         context.statisticsDataStore.edit { preferences ->
             preferences[SESSION_START] = System.currentTimeMillis()
         }
-    }
-
-    /**
-     * Trigger a re-emission of `statisticsFlow` to refresh displayed values.
-     */
-    fun refresh() {
-        refreshTrigger.value = System.currentTimeMillis()
     }
 
     /**

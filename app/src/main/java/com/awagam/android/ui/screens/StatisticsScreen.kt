@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.awagam.android.ui.theme.ErrorText
 import com.awagam.android.ui.viewmodel.StatisticsViewModel
+import com.awagam.android.util.formatPercent
 import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +53,7 @@ fun StatisticsScreen(
     BackHandler { onNavigateBack() }
 
     val viewModel: StatisticsViewModel = viewModel()
-    val statistics by viewModel.statisticsFlow.collectAsState(initial = null)
+    val statisticsState by viewModel.statisticsFlow.collectAsState(initial = null)
 
     Scaffold(
         topBar = {
@@ -62,11 +63,12 @@ fun StatisticsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {}
+                }
             )
         }
     ) { padding ->
+        // Captured so the branch below can rely on it being non-null
+        val statistics = statisticsState
         if (statistics == null) {
             Box(
                 modifier = Modifier
@@ -94,19 +96,19 @@ fun StatisticsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatRow(
                             label = "Uptime",
-                            value = viewModel.formatUptime(statistics?.sessionUptime ?: 0L)
+                            value = viewModel.formatUptime(statistics.sessionUptime)
                         )
                         StatRow(
                             label = "Queries",
-                            value = NumberFormat.getNumberInstance().format(statistics?.sessionQueries ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.sessionQueries)
                         )
                         StatRow(
                             label = "Blocked",
-                            value = NumberFormat.getNumberInstance().format(statistics?.sessionBlocked ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.sessionBlocked)
                         )
                         ProgressRow(
                             label = "Block Rate",
-                            progress = (statistics?.blockRate?.toFloat() ?: 0f),
+                            progress = statistics.blockRate.toFloat(),
                             color = ErrorText
                         )
                     }
@@ -117,15 +119,15 @@ fun StatisticsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatRow(
                             label = "Cache Hits",
-                            value = NumberFormat.getNumberInstance().format(statistics?.cacheHits ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.cacheHits)
                         )
                         StatRow(
                             label = "Cache Misses",
-                            value = NumberFormat.getNumberInstance().format(statistics?.cacheMisses ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.cacheMisses)
                         )
                         ProgressRow(
                             label = "Cache Hit Rate",
-                            progress = (statistics?.cacheHitRate?.toFloat() ?: 0f),
+                            progress = statistics.cacheHitRate.toFloat(),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -136,37 +138,24 @@ fun StatisticsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatRow(
                             label = "Total Queries",
-                            value = NumberFormat.getNumberInstance().format(statistics?.totalQueries ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.totalQueries)
                         )
                         StatRow(
                             label = "Total Blocked",
-                            value = NumberFormat.getNumberInstance().format(statistics?.blockedQueries ?: 0)
+                            value = NumberFormat.getNumberInstance().format(statistics.blockedQueries)
                         )
                         StatRow(
                             label = "Data Processed",
-                            value = viewModel.formatDataUsage(statistics?.totalBytes ?: 0L)
+                            value = viewModel.formatDataUsage(statistics.totalBytes)
                         )
                     }
                 }
 
-                // Control Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                OutlinedButton(
+                    onClick = { viewModel.resetSession() },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
-                        onClick = { viewModel.resetSession() },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Reset session")
-                    }
-
-                    OutlinedButton(
-                        onClick = { viewModel.refreshStatistics() },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Refresh")
-                    }
+                    Text("Reset session")
                 }
             }
         }
@@ -243,7 +232,8 @@ private fun ProgressRow(
                 .weight(1f)
                 .height(4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                // Darker than the card, so the unfilled part of the track shows
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             Box(
                 modifier = Modifier
@@ -255,7 +245,7 @@ private fun ProgressRow(
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "%.1f".format(progress * 100).removeSuffix(".0") + "%",
+            text = formatPercent(progress),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium
         )
