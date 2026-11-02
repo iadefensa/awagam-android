@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
 // to a versioned name (copy, not rename, since install tasks and Android Studio
 // deploy the original file). The copy hangs off packaging, which install tasks
 // run too, so it can’t lag behind the APK they rebuild.
-tasks.whenTaskAdded {
+tasks.configureEach {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
     }
@@ -127,16 +127,16 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // DNS parsing
-    implementation("dnsjava:dnsjava:3.6.5")
+    implementation("dnsjava:dnsjava:3.7.0")
 
     // Networking
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     // DataStore preferences
-    implementation("androidx.datastore:datastore-preferences:1.2.0")
+    implementation("androidx.datastore:datastore-preferences:1.3.0")
 
     // WorkManager for background updates
     implementation("androidx.work:work-runtime-ktx:2.12.0")
