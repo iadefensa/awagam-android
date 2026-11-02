@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
 // to a versioned name (copy, not rename, since install tasks and Android Studio
 // deploy the original file). The copy hangs off packaging, which install tasks
 // run too, so it can’t lag behind the APK they rebuild.
-tasks.whenTaskAdded {
+tasks.configureEach {
     if (name == "assembleDebug" || name == "assembleRelease") {
         dependsOn("testDebugUnitTest")
     }
@@ -142,8 +142,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.12.0")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.12.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
