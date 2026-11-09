@@ -127,7 +127,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // DNS parsing
-    implementation("dnsjava:dnsjava:3.7.0")
+    implementation("dnsjava:dnsjava:3.7.1")
 
     // Networking
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
