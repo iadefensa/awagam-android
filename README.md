@@ -139,17 +139,17 @@ Store listing text and images live in fastlane/metadata/android/en-US/: title.tx
 
 #### Play Console Declarations
 
-These answers describe the app, not a particular release, so they hold until the app’s behavior changes. Restate them verbatim whenever the console asks again.
+These answers describe the app, not a particular release, so they hold until the app’s behavior changes. These need to be restated whenever the console asks again.
 
-**VPN (App content → VPN).** The app uses `VpnService`, and this is its core functionality. It establishes a local, on-device VPN interface for the sole purpose of intercepting DNS queries and comparing them against user-configured blocklists. Blocked lookups are answered locally with `0.0.0.0`; all others are forwarded to the user-selected DNS-over-HTTPS resolver, or to a local resolver on the device the user selected instead. No other traffic is routed, inspected, proxied, or sent to any server operated by the developer.
+**VPN (_App content_ → _VPN_).** The app uses `VpnService`, and this is its core functionality. It establishes a local, on-device VPN interface for the sole purpose of intercepting DNS queries and comparing them against user-configured blocklists. Blocked lookups are answered locally with `0.0.0.0`; all others are forwarded to the user-selected DNS-over-HTTPS resolver, or to a local resolver on the device the user selected instead. No other traffic is routed, inspected, proxied, or sent to any server operated by the developer.
 
 **`specialUse` foreground service justification.** DNS filtering must keep running while the user is in other apps, so the `VpnService` runs in the foreground. Android defines no foreground service type for VPN or DNS filtering, which leaves `specialUse` as the only applicable type; the declared subtype is `DNS filtering for content blocking` (see `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` in app/src/main/AndroidManifest.xml). The service runs only while the user has protection enabled, and stops when they disable it.
 
-**Data safety.** The app collects and shares no user data, so the form reduces to “No” on data collection and data sharing; the encryption-in-transit and data-deletion questions do not apply. Preferences, cached blocklists, and query counts stay on the device, are never transmitted, and are removed on uninstall. `android:allowBackup="false"` plus the backup and data extraction rules keep them out of Android backup and device-to-device transfer as well. There is no analytics, telemetry, crash reporting, advertising, or DNS query logging. The two outbound connection types—DNS queries to the user’s chosen resolver and blocklist fetches from URLs the user adds—are user-initiated app functionality, not collection by the developer.
+**Data safety.** The app collects and shares no user data, so the form reduces to _No_ on data collection and data sharing; the encryption-in-transit and data-deletion questions do not apply. Preferences, cached blocklists, and query counts stay on the device, are never transmitted, and are removed on uninstall. `android:allowBackup="false"` plus the backup and data extraction rules keep them out of Android backup and device-to-device transfer as well. There is no analytics, telemetry, crash reporting, advertising, or DNS query logging. The two outbound connection types—DNS queries to the user’s chosen resolver and blocklist fetches from URLs the user adds—are user-initiated app functionality, not collection by the developer.
 
 **Privacy policy URL.** https://github.com/iadefensa/awagam-android/blob/main/PRIVACY.md
 
-**Content rating.** Category: utility or productivity. Every content question (violence, sexuality, profanity, controlled substances, gambling, horror) is “No.” The app has no user-generated content, no user-to-user communication, no ads, and no digital purchases, and it neither collects nor shares location or personal information.
+**Content rating.** Category: utility or productivity. Every content question (violence, sexuality, profanity, controlled substances, gambling, horror) is _No_. The app has no user-generated content, no user-to-user communication, no ads, and no digital purchases, and it neither collects nor shares location or personal information.
 
 ### Project Structure
 
