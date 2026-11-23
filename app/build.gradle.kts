@@ -133,7 +133,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
 
     // DataStore preferences
     implementation("androidx.datastore:datastore-preferences:1.3.0")
@@ -147,7 +147,7 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("org.robolectric:robolectric:4.18")
     testImplementation("androidx.test:core:1.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
